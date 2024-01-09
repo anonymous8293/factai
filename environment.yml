@@ -1,0 +1,29 @@
+name: tint
+channels:
+  - defaults
+  - pytorch
+  - conda-forge
+  - huggingface
+  - nvidia
+dependencies:
+  - python==3.9.7
+  - cudatoolkit==11.6
+  - captum
+  - datasets
+  - git
+  - jupyter
+  - numpy
+  - optuna
+  - pandas
+  - pip
+  - scikit-image
+  - scikit-learn
+  - scipy
+  - pytorch
+  - pytorch-lightning
+  - torchmetrics
+  - torchvision
+  - transformers
+  - pip:
+      - black
+      - flake8
