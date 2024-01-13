@@ -11,7 +11,7 @@ from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.loggers import TensorBoardLogger
 from typing import List
 
-from tint.attr import (
+from dev_tint.attr import (
     DynaMask,
     ExtremalMask,
     Fit,
@@ -20,7 +20,7 @@ from tint.attr import (
     TemporalOcclusion,
     TimeForwardTunnel,
 )
-from tint.attr.models import (
+from dev_tint.attr.models import (
     ExtremalMaskNet,
     JointFeatureGeneratorNet,
     MaskNet,
@@ -38,8 +38,17 @@ from tint.metrics.white_box import (
 from tint.models import MLP, RNN
 
 
-from experiments.hmm.classifier import StateClassifierNet
 
+
+
+def get_model(check_name, trainer, model, data_module, seed, rerun_all=False):
+    checkpoint=str(seed)+"_"+check_name+'.ckpt'
+    if os.path.exists(checkpoint) and not rerun_all:
+        model.load_state_dict(th.load(checkpoint))
+    else:
+       trainer.fit(model, datamodule=data_module)
+       th.save(model.state_dict(), checkpoint)
+    return model
 
 def main(
     explainers: List[str],
@@ -50,6 +59,7 @@ def main(
     lambda_1: float = 1.0,
     lambda_2: float = 1.0,
     output_file: str = "results.csv",
+    rerun_all=False
 ):
     # If deterministic, seed everything
     if deterministic:
@@ -80,27 +90,18 @@ def main(
 
     # Train classifier
     trainer = Trainer(
-        max_epochs=1,
+        # max_epochs=500,
+        max_epochs=3,
         accelerator=accelerator,
         devices=device_id,
         deterministic=deterministic,
         logger=TensorBoardLogger(
             save_dir=".",
             version=random.getrandbits(128),
-        ),
     )
-    print("max_epochs is 1!!")
-    print("starting training")
-    trainer_checkpoint = "hmm_trainer.pth"
-    if(deterministic):
-        trainer_checkpoint=str(seed)+"_"+trainer_checkpoint
-    if os.path.exists(trainer_checkpoint):
-        trainer.load_state_dict(th.load(trainer_checkpoint))
-    else:
-        trainer.fit(classifier, datamodule=hmm)
-        th.save(trainer.state_dict(), trainer_checkpoint)
-    print("finished training")
-
+    )
+    # trainer.fit(classifier, datamodule=hmm)
+    classifier=get_model(check_name="classifier",trainer=trainer, model=classifier, data_module=hmm, seed=seed, rerun_all=rerun_all)
     # Get data for explainers
     with lock:
         x_train = hmm.preprocess(split="train")["x"].to(device)
@@ -167,7 +168,8 @@ def main(
 
     if "extremal_mask" in explainers:
         trainer = Trainer(
-            max_epochs=500,
+            # max_epochs=500,
+            max_epochs=3,
             accelerator=accelerator,
             devices=device_id,
             log_every_n_steps=2,

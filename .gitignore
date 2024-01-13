@@ -21,3 +21,6 @@ lightning_logs
 
 # Latex
 out
+
+#checkpoints
+.ckpt

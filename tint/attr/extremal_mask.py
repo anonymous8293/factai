@@ -1,6 +1,18 @@
 import copy
 import torch as th
 
+
+
+import os
+def get_model(check_name, trainer, model, train_dataloaders, seed, rerun_all=False):
+    checkpoint=str(seed)+"_"+check_name+'.ckpt'
+    if os.path.exists(checkpoint) and not rerun_all:
+        model.load_state_dict(th.load(checkpoint))
+    else:
+       trainer.fit(model, train_dataloaders=train_dataloaders)
+       th.save(model.state_dict(), checkpoint)
+    return model
+
 from captum.attr._utils.attribution import PerturbationAttribution
 from captum.log import log_usage
 from captum._utils.common import (
@@ -70,6 +82,7 @@ class ExtremalMask(PerturbationAttribution):
         batch_size: int = 32,
         temporal_additional_forward_args: Tuple[bool] = None,
         return_temporal_attributions: bool = False,
+        seed:int=42
     ) -> TensorOrTupleOfTensorsGeneric:
         """
         Attribute method.
@@ -228,7 +241,8 @@ class ExtremalMask(PerturbationAttribution):
         )
 
         # Fit model
-        trainer.fit(mask_net, train_dataloaders=dataloader)
+        # trainer.fit(mask_net, train_dataloaders=train_dataloaders)
+        mask_net=get_model(check_name="extremal_mask_net",trainer=trainer, model=mask_net, train_dataloaders=dataloader, seed=seed)
 
         # Set model to eval mode and cast it to device
         mask_net.eval()
