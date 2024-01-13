@@ -3,6 +3,7 @@ import numpy as np
 import random
 import torch as th
 import torch.nn as nn
+import os
 
 from argparse import ArgumentParser
 from captum.attr import DeepLift, GradientShap, IntegratedGradients, Lime
@@ -79,7 +80,7 @@ def main(
 
     # Train classifier
     trainer = Trainer(
-        max_epochs=50,
+        max_epochs=1,
         accelerator=accelerator,
         devices=device_id,
         deterministic=deterministic,
@@ -88,7 +89,17 @@ def main(
             version=random.getrandbits(128),
         ),
     )
-    trainer.fit(classifier, datamodule=hmm)
+    print("max_epochs is 1!!")
+    print("starting training")
+    trainer_checkpoint = "hmm_trainer.pth"
+    if(deterministic):
+        trainer_checkpoint=str(seed)+"_"+trainer_checkpoint
+    if os.path.exists(trainer_checkpoint):
+        trainer.load_state_dict(th.load(trainer_checkpoint))
+    else:
+        trainer.fit(classifier, datamodule=hmm)
+        th.save(trainer.state_dict(), trainer_checkpoint)
+    print("finished training")
 
     # Get data for explainers
     with lock:
