@@ -10,6 +10,7 @@ from captum.attr import DeepLift, GradientShap, IntegratedGradients, Lime
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.loggers import TensorBoardLogger
 from typing import List
+from classifier import StateClassifierNet
 
 from dev_tint.attr import (
     DynaMask,
@@ -26,8 +27,8 @@ from dev_tint.attr.models import (
     MaskNet,
     RetainNet,
 )
-from tint.datasets import HMM
-from tint.metrics.white_box import (
+from dev_tint.datasets import HMM
+from dev_tint.metrics.white_box import (
     aup,
     aur,
     information,
@@ -35,19 +36,18 @@ from tint.metrics.white_box import (
     roc_auc,
     auprc,
 )
-from tint.models import MLP, RNN
+from dev_tint.models import MLP, RNN
 
+def get_model(check_name, trainer, model, data_module, seed, retrain):
 
+    checkpoint = "models/hmm_" + str(seed) + "_" + check_name+'.ckpt'
 
-
-
-def get_model(check_name, trainer, model, data_module, seed, rerun_all=False):
-    checkpoint=str(seed)+"_"+check_name+'.ckpt'
-    if os.path.exists(checkpoint) and not rerun_all:
+    if os.path.exists(checkpoint) and not retrain:
         model.load_state_dict(th.load(checkpoint))
     else:
-       trainer.fit(model, datamodule=data_module)
-       th.save(model.state_dict(), checkpoint)
+        trainer.fit(model, datamodule=data_module)
+        th.save(model.state_dict(), checkpoint)
+
     return model
 
 def main(
@@ -59,8 +59,9 @@ def main(
     lambda_1: float = 1.0,
     lambda_2: float = 1.0,
     output_file: str = "results.csv",
-    rerun_all=False
+    retrain_classifier: bool = False
 ):
+
     # If deterministic, seed everything
     if deterministic:
         seed_everything(seed=seed, workers=True)
@@ -90,18 +91,18 @@ def main(
 
     # Train classifier
     trainer = Trainer(
-        # max_epochs=500,
-        max_epochs=3,
+        max_epochs=50,
         accelerator=accelerator,
         devices=device_id,
         deterministic=deterministic,
-        logger=TensorBoardLogger(
-            save_dir=".",
-            version=random.getrandbits(128),
+        # logger=TensorBoardLogger(
+        #     save_dir=".",
+        #     version=random.getrandbits(128),
+        # )
     )
-    )
-    # trainer.fit(classifier, datamodule=hmm)
-    classifier=get_model(check_name="classifier",trainer=trainer, model=classifier, data_module=hmm, seed=seed, rerun_all=rerun_all)
+    
+    classifier = get_model(check_name="classifier", trainer=trainer, model=classifier, data_module=hmm, seed=seed, retrain=retrain_classifier)
+
     # Get data for explainers
     with lock:
         x_train = hmm.preprocess(split="train")["x"].to(device)
@@ -140,10 +141,10 @@ def main(
             devices=device_id,
             log_every_n_steps=2,
             deterministic=deterministic,
-            logger=TensorBoardLogger(
-                save_dir=".",
-                version=random.getrandbits(128),
-            ),
+            # logger=TensorBoardLogger(
+            #     save_dir=".",
+            #     version=random.getrandbits(128),
+            # ),
         )
         mask = MaskNet(
             forward_func=classifier,
@@ -168,16 +169,15 @@ def main(
 
     if "extremal_mask" in explainers:
         trainer = Trainer(
-            # max_epochs=500,
-            max_epochs=3,
+            max_epochs=500,
             accelerator=accelerator,
             devices=device_id,
             log_every_n_steps=2,
             deterministic=deterministic,
-            logger=TensorBoardLogger(
-                save_dir=".",
-                version=random.getrandbits(128),
-            ),
+            # logger=TensorBoardLogger(
+            #     save_dir=".",
+            #     version=random.getrandbits(128),
+            # ),
         )
         mask = ExtremalMaskNet(
             forward_func=classifier,
@@ -213,10 +213,10 @@ def main(
             devices=device_id,
             log_every_n_steps=10,
             deterministic=deterministic,
-            logger=TensorBoardLogger(
-                save_dir=".",
-                version=random.getrandbits(128),
-            ),
+            # logger=TensorBoardLogger(
+            #     save_dir=".",
+            #     version=random.getrandbits(128),
+            # ),
         )
         explainer = Fit(
             classifier,
@@ -299,10 +299,10 @@ def main(
                 accelerator=accelerator,
                 devices=device_id,
                 deterministic=deterministic,
-                logger=TensorBoardLogger(
-                    save_dir=".",
-                    version=random.getrandbits(128),
-                ),
+                # logger=TensorBoardLogger(
+                #     save_dir=".",
+                #     version=random.getrandbits(128),
+                # ),
             ),
         )
         attr["retain"] = (
@@ -387,8 +387,13 @@ def parse_args():
         default="results.csv",
         help="Where to save the results.",
     )
+    parser.add_argument(
+        "--retrain",
+        type=bool,
+        default="false",
+        help="Whether to retrain the classifier",
+    )
     return parser.parse_args()
-
 
 if __name__ == "__main__":
     args = parse_args()
@@ -401,4 +406,5 @@ if __name__ == "__main__":
         lambda_1=args.lambda_1,
         lambda_2=args.lambda_2,
         output_file=args.output_file,
+        retrain_classifier=args.retrain
     )
