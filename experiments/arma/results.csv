@@ -59,3 +59,7 @@ rare-time,42,4,integrated_gradients,1.0,0.1297,452.3,483.3
 rare-time,42,4,occlusion,1.0,0.1288,450.3,479.0
 rare-time,42,4,permutation,1.0,0.1482,494.3,549.3
 rare-time,42,4,shapley_values_sampling,1.0,0.1288,450.3,479.0
+rare-feature,42,0,extremal_mask,1.0,0.7527,1.297e+04,46.23
+rare-feature,42,0,extremal_mask,1.0,0.7571,1.295e+04,48.74
+rare-feature,42,0,extremal_mask,1.0,0.7571,1.295e+04,48.74
+rare-feature,42,0,extremal_mask,0.9982,0.756,1.313e+06,3.754e+03

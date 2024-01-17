@@ -22,6 +22,27 @@ from tint.attr.models import ExtremalMaskNet, MaskNet
 from tint.datasets import Arma
 from tint.metrics.white_box import aup, aur, information, entropy
 
+import pickle
+
+def save_explainer(explainer, mlp=None, explainer_name="explainer"):
+    if mlp is not None:
+        with open(f"mlp_{explainer_name}.pkl", "wb") as f:
+            pickle.dump(mlp, f)
+
+    with open(f"{explainer_name}.pkl", "wb") as f:
+        pickle.dump(explainer, f)
+
+
+def load_explainer(explainer_name="explainer"):
+    # with open(f"mlp_{explainer_name}.pkl", "rb") as f:
+    #     mlp = pickle.load(f)
+
+    with open(f"{explainer_name}.pkl", "rb") as f:
+        explainer = pickle.load(f)       
+
+    # return mlp, explainer
+    return explainer
+
 
 def main(
     rare_dim: int,
@@ -50,8 +71,8 @@ def main(
 
     # Only use the first 10 data points
     with lock:
-        x = arma.preprocess()["x"][:10].to(device)
-        true_saliency = arma.true_saliency(dim=rare_dim)[:10].to(device)
+        x = arma.preprocess()["x"].to(device)
+        true_saliency = arma.true_saliency(dim=rare_dim).to(device)
 
     # Create dict of attributions
     attr = dict()
@@ -90,7 +111,7 @@ def main(
 
     if "extremal_mask" in explainers:
         trainer = Trainer(
-            max_epochs=2000,
+            max_epochs=500,
             accelerator=accelerator,
             devices=device_id,
             log_every_n_steps=2,
@@ -114,6 +135,9 @@ def main(
             additional_forward_args=(true_saliency,),
         )
         attr["extremal_mask"] = _attr
+        save_explainer(_attr, explainer_name="extremal_attr")
+        save_explainer(mask, explainer_name="extremal_mask_net")
+        save_explainer(explainer, explainer_name="extremal_explainer")
 
     if "integrated_gradients" in explainers:
         attr["integrated_gradients"] = th.zeros_like(x)
