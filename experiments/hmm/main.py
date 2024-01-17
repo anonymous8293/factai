@@ -5,13 +5,15 @@ import torch as th
 import torch.nn as nn
 import os
 import pickle
+import sys
 
 from argparse import ArgumentParser
 from captum.attr import DeepLift, GradientShap, IntegratedGradients, Lime
 from pytorch_lightning import Trainer, seed_everything
-from pytorch_lightning.loggers import TensorBoardLogger
+
+# from pytorch_lightning.loggers import TensorBoardLogger
 from typing import List
-from classifier import StateClassifierNet
+from experiments.hmm.classifier import StateClassifierNet
 
 from tint.attr import (
     DynaMask,
@@ -87,6 +89,9 @@ def main(
 
     # Load data
     hmm = HMM(n_folds=5, fold=fold, seed=seed)
+    print(hmm.true_saliency(split="test"))
+
+    raise Exception()
 
     # Create classifier
     classifier = StateClassifierNet(

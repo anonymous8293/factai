@@ -23,4 +23,4 @@ echo "starting assesment"
 python ./experiments/hmm/main.py --device cuda --explainers deep_lift
 echo "finished assessment"
 current_time=$(date "+%Y.%m.%d-%H.%M.%S")
-cp results.csv ./experiments/hmm/results/${current_time}_results.csv
+cp results.csv ./experiments/hmm/reproducibility_results/${current_time}_results.csv
