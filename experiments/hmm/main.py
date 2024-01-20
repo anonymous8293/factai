@@ -42,6 +42,10 @@ from tint.metrics.white_box import (
 from tint.models import MLP, RNN
 
 
+from experiments.utils.get_model import get_model
+from experiments.hmm.classifier import StateClassifierNet
+
+
 def get_model(check_name, trainer, model, data_module, seed, retrain=False):
     checkpoint = "models/hmm_" + str(seed) + "_" + check_name + ".ckpt"
 
@@ -282,12 +286,12 @@ def main(
             batch_size=100,
         )
         attr["extremal_mask"] = _attr.to(device)
-        save_explainer(_attr, explainer_name=f"{seed}_hmm_extremal_attr")
-        save_explainer(mask, explainer_name=f"{seed}_hmm_extremal_mask_net")
-        save_explainer(
-            mask.net.model, explainer_name=f"{seed}_hmm_extremal_perturbation_net"
-        )
-        save_explainer(explainer, explainer_name=f"{seed}_hmm_extremal_explainer")
+        # save_explainer(_attr, explainer_name=f"{seed}_hmm_extremal_attr")
+        # save_explainer(mask, explainer_name=f"{seed}_hmm_extremal_mask_net")
+        # save_explainer(
+        #     mask.net.model, explainer_name=f"{seed}_hmm_extremal_perturbation_net"
+        # )
+        # save_explainer(explainer, explainer_name=f"{seed}_hmm_extremal_explainer")
 
         with open(output_file, "a") as fp, lock:
             k = "extremal_mask"
