@@ -67,6 +67,18 @@ def save_explainer(explainer, mlp=None, explainer_name="explainer"):
         pickle.dump(explainer, f)
 
 
+def get_model(check_name, trainer, model, data_module, seed, retrain):
+    checkpoint = "models/hmm_" + str(seed) + "_" + check_name + ".ckpt"
+
+    if os.path.exists(checkpoint) and not retrain:
+        model.load_state_dict(th.load(checkpoint))
+    else:
+        trainer.fit(model, datamodule=data_module)
+        th.save(model.state_dict(), checkpoint)
+
+    return model
+
+
 def main(
     explainers: List[str],
     device: str = "cpu",
@@ -77,6 +89,7 @@ def main(
     lambda_2: float = 1.0,
     retrain_classifier: bool = False,
     output_file: str = "results_per_fold.csv",
+    retrain_classifier: bool = False,
 ):
     dataset_name = "hmm"
 
@@ -123,13 +136,18 @@ def main(
     )
 
     classifier = get_model(
-        check_name="classifier",
-        trainer=trainer,
-        model=classifier,
-        data_module=hmm,
-        seed=seed,
-        retrain=retrain_classifier,
+        trainer,
+        classifier,
+        "classifier",
+        dataset_name,
+        seed,
+        fold,
+        lambda_1=lambda_1,
+        lambda_2=lambda_2,
+        datamodule=hmm,
     )
+
+    # trainer.fit(classifier, datamodule=hmm)
 
     # Get data for explainers
     with lock:
@@ -264,12 +282,12 @@ def main(
             batch_size=100,
         )
         attr["extremal_mask"] = _attr.to(device)
-        # save_explainer(_attr, explainer_name=f"{seed}_hmm_extremal_attr")
-        # save_explainer(mask, explainer_name=f"{seed}_hmm_extremal_mask_net")
-        # save_explainer(
-        #     mask.net.model, explainer_name=f"{seed}_hmm_extremal_perturbation_net"
-        # )
-        # save_explainer(explainer, explainer_name=f"{seed}_hmm_extremal_explainer")
+        save_explainer(_attr, explainer_name=f"{seed}_hmm_extremal_attr")
+        save_explainer(mask, explainer_name=f"{seed}_hmm_extremal_mask_net")
+        save_explainer(
+            mask.net.model, explainer_name=f"{seed}_hmm_extremal_perturbation_net"
+        )
+        save_explainer(explainer, explainer_name=f"{seed}_hmm_extremal_explainer")
 
         with open(output_file, "a") as fp, lock:
             k = "extremal_mask"
