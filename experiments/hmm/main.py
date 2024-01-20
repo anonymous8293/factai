@@ -4,6 +4,7 @@ import random
 import torch as th
 import torch.nn as nn
 import os
+import pickle
 
 from argparse import ArgumentParser
 from captum.attr import DeepLift, GradientShap, IntegratedGradients, Lime
@@ -12,7 +13,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from typing import List
 from classifier import StateClassifierNet
 
-from dev_tint.attr import (
+from tint.attr import (
     DynaMask,
     ExtremalMask,
     Fit,
@@ -21,14 +22,14 @@ from dev_tint.attr import (
     TemporalOcclusion,
     TimeForwardTunnel,
 )
-from dev_tint.attr.models import (
+from tint.attr.models import (
     ExtremalMaskNet,
     JointFeatureGeneratorNet,
     MaskNet,
     RetainNet,
 )
-from dev_tint.datasets import HMM
-from dev_tint.metrics.white_box import (
+from tint.datasets import HMM
+from tint.metrics.white_box import (
     aup,
     aur,
     information,
@@ -36,11 +37,11 @@ from dev_tint.metrics.white_box import (
     roc_auc,
     auprc,
 )
-from dev_tint.models import MLP, RNN
+from tint.models import MLP, RNN
+
 
 def get_model(check_name, trainer, model, data_module, seed, retrain):
-
-    checkpoint = "models/hmm_" + str(seed) + "_" + check_name+'.ckpt'
+    checkpoint = "models/hmm_" + str(seed) + "_" + check_name + ".ckpt"
 
     if os.path.exists(checkpoint) and not retrain:
         model.load_state_dict(th.load(checkpoint))
@@ -49,6 +50,16 @@ def get_model(check_name, trainer, model, data_module, seed, retrain):
         th.save(model.state_dict(), checkpoint)
 
     return model
+
+
+def save_explainer(explainer, mlp=None, explainer_name="explainer"):
+    if mlp is not None:
+        with open(f"mlp_{explainer_name}.pkl", "wb") as f:
+            pickle.dump(mlp, f)
+
+    with open(f"{explainer_name}.pkl", "wb") as f:
+        pickle.dump(explainer, f)
+
 
 def main(
     explainers: List[str],
@@ -59,9 +70,8 @@ def main(
     lambda_1: float = 1.0,
     lambda_2: float = 1.0,
     output_file: str = "results.csv",
-    retrain_classifier: bool = False
+    retrain_classifier: bool = False,
 ):
-
     # If deterministic, seed everything
     if deterministic:
         seed_everything(seed=seed, workers=True)
@@ -100,8 +110,15 @@ def main(
         #     version=random.getrandbits(128),
         # )
     )
-    
-    classifier = get_model(check_name="classifier", trainer=trainer, model=classifier, data_module=hmm, seed=seed, retrain=retrain_classifier)
+
+    classifier = get_model(
+        check_name="classifier",
+        trainer=trainer,
+        model=classifier,
+        data_module=hmm,
+        seed=seed,
+        retrain=retrain_classifier,
+    )
 
     # Get data for explainers
     with lock:
@@ -169,7 +186,7 @@ def main(
 
     if "extremal_mask" in explainers:
         trainer = Trainer(
-            max_epochs=500,
+            max_epochs=200,
             accelerator=accelerator,
             devices=device_id,
             log_every_n_steps=2,
@@ -204,6 +221,12 @@ def main(
             batch_size=100,
         )
         attr["extremal_mask"] = _attr.to(device)
+        save_explainer(_attr, explainer_name=f"{seed}_hmm_extremal_attr")
+        save_explainer(mask, explainer_name=f"{seed}_hmm_extremal_mask_net")
+        save_explainer(
+            mask.net.model, explainer_name=f"{seed}_hmm_extremal_perturbation_net"
+        )
+        save_explainer(explainer, explainer_name=f"{seed}_hmm_extremal_explainer")
 
     if "fit" in explainers:
         generator = JointFeatureGeneratorNet(rnn_hidden_size=6)
@@ -305,9 +328,7 @@ def main(
                 # ),
             ),
         )
-        attr["retain"] = (
-            explainer.attribute(x_test, target=y_test).abs().to(device)
-        )
+        attr["retain"] = explainer.attribute(x_test, target=y_test).abs().to(device)
 
     with open(output_file, "a") as fp, lock:
         for k, v in attr.items():
@@ -331,16 +352,16 @@ def parse_args():
         "--explainers",
         type=str,
         default=[
-            "deep_lift",
-            "dyna_mask",
+            # "deep_lift",
+            # "dyna_mask",
             "extremal_mask",
-            "fit",
-            "gradient_shap",
-            "integrated_gradients",
-            "lime",
-            "augmented_occlusion",
-            "occlusion",
-            "retain",
+            # "fit",
+            # "gradient_shap",
+            # "integrated_gradients",
+            # "lime",
+            # "augmented_occlusion",
+            # "occlusion",
+            # "retain",
         ],
         nargs="+",
         metavar="N",
@@ -395,6 +416,7 @@ def parse_args():
     )
     return parser.parse_args()
 
+
 if __name__ == "__main__":
     args = parse_args()
     main(
@@ -406,5 +428,5 @@ if __name__ == "__main__":
         lambda_1=args.lambda_1,
         lambda_2=args.lambda_2,
         output_file=args.output_file,
-        retrain_classifier=args.retrain
+        retrain_classifier=args.retrain,
     )
