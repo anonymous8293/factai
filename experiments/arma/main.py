@@ -135,9 +135,9 @@ def main(
             additional_forward_args=(true_saliency,),
         )
         attr["extremal_mask"] = _attr
-        save_explainer(_attr, explainer_name="extremal_attr")
-        save_explainer(mask, explainer_name="extremal_mask_net")
-        save_explainer(explainer, explainer_name="extremal_explainer")
+        # save_explainer(_attr, explainer_name="extremal_attr")
+        # save_explainer(mask, explainer_name="extremal_mask_net")
+        # save_explainer(explainer, explainer_name="extremal_explainer")
 
     if "integrated_gradients" in explainers:
         attr["integrated_gradients"] = th.zeros_like(x)

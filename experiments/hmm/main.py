@@ -40,7 +40,7 @@ from tint.metrics.white_box import (
 from tint.models import MLP, RNN
 
 
-def get_model(check_name, trainer, model, data_module, seed, retrain):
+def get_model(check_name, trainer, model, data_module, seed, retrain=False):
     checkpoint = "models/hmm_" + str(seed) + "_" + check_name + ".ckpt"
 
     if os.path.exists(checkpoint) and not retrain:
@@ -221,12 +221,12 @@ def main(
             batch_size=100,
         )
         attr["extremal_mask"] = _attr.to(device)
-        save_explainer(_attr, explainer_name=f"{seed}_hmm_extremal_attr")
-        save_explainer(mask, explainer_name=f"{seed}_hmm_extremal_mask_net")
-        save_explainer(
-            mask.net.model, explainer_name=f"{seed}_hmm_extremal_perturbation_net"
-        )
-        save_explainer(explainer, explainer_name=f"{seed}_hmm_extremal_explainer")
+        # save_explainer(_attr, explainer_name=f"{seed}_hmm_extremal_attr")
+        # save_explainer(mask, explainer_name=f"{seed}_hmm_extremal_mask_net")
+        # save_explainer(
+        #     mask.net.model, explainer_name=f"{seed}_hmm_extremal_perturbation_net"
+        # )
+        # save_explainer(explainer, explainer_name=f"{seed}_hmm_extremal_explainer")
 
     if "fit" in explainers:
         generator = JointFeatureGeneratorNet(rnn_hidden_size=6)
@@ -410,8 +410,7 @@ def parse_args():
     )
     parser.add_argument(
         "--retrain",
-        type=bool,
-        default="false",
+        action="store_true",
         help="Whether to retrain the classifier",
     )
     return parser.parse_args()
