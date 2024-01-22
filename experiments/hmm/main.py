@@ -204,7 +204,6 @@ def main(
             )
         )
         mask = ExtremalMaskNet(
-            dataset_name,
             forward_func=classifier,
             model=nn.Sequential(
                 RNN(
@@ -220,7 +219,7 @@ def main(
             optim="adam",
             lr=0.01,
         )
-        explainer = ExtremalMask(classifier, seed, fold)
+        explainer = ExtremalMask(dataset_name, classifier, seed, fold)
         _attr = explainer.attribute(
             x_test,
             additional_forward_args=(True,),
