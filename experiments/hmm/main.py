@@ -3,15 +3,12 @@ import numpy as np
 import random
 import torch as th
 import torch.nn as nn
-import os
-import sys
 
 from argparse import ArgumentParser
 from captum.attr import DeepLift, GradientShap, IntegratedGradients, Lime
 from pytorch_lightning import Trainer, seed_everything
-# from pytorch_lightning.loggers import TensorBoardLogger
 from typing import List
-from experiments.hmm.classifier import StateClassifierNet
+from pytorch_lightning.loggers import TensorBoardLogger
 
 from tint.attr import (
     DynaMask,
@@ -39,17 +36,9 @@ from tint.metrics.white_box import (
 )
 from tint.models import MLP, RNN
 
-def get_model(check_name, trainer, model, data_module, seed, retrain):
+from experiments.utils.get_model import get_model
+from experiments.hmm.classifier import StateClassifierNet
 
-    checkpoint = "models/hmm_" + str(seed) + "_" + check_name+'.ckpt'
-
-    if os.path.exists(checkpoint) and not retrain:
-        model.load_state_dict(th.load(checkpoint))
-    else:
-        trainer.fit(model, datamodule=data_module)
-        th.save(model.state_dict(), checkpoint)
-
-    return model
 
 def main(
     explainers: List[str],
@@ -59,9 +48,9 @@ def main(
     deterministic: bool = False,
     lambda_1: float = 1.0,
     lambda_2: float = 1.0,
-    output_file: str = "results.csv",
-    retrain_classifier: bool = False
+    output_file: str = "results_per_fold.csv",
 ):
+    dataset_name = 'hmm'
 
     # If deterministic, seed everything
     if deterministic:
@@ -78,9 +67,6 @@ def main(
 
     # Load data
     hmm = HMM(n_folds=5, fold=fold, seed=seed)
-    print(hmm.true_saliency(split="test"))
-    
-    raise Exception()
 
     # Create classifier
     classifier = StateClassifierNet(
@@ -99,13 +85,15 @@ def main(
         accelerator=accelerator,
         devices=device_id,
         deterministic=deterministic,
-        # logger=TensorBoardLogger(
-        #     save_dir=".",
-        #     version=random.getrandbits(128),
-        # )
+        logger=TensorBoardLogger(
+            save_dir=".",
+            version=random.getrandbits(128),
+        )
     )
     
-    classifier = get_model(check_name="classifier", trainer=trainer, model=classifier, data_module=hmm, seed=seed, retrain=retrain_classifier)
+    classifier = get_model(trainer, classifier, 'classifier', dataset_name, seed, fold, lambda_1=lambda_1, lambda_2=lambda_2, datamodule=hmm)
+    
+    # trainer.fit(classifier, datamodule=hmm)
 
     # Get data for explainers
     with lock:
@@ -121,7 +109,7 @@ def main(
     classifier.to(device)
 
     # Disable cudnn if using cuda accelerator.
-    # Please see https://captum.ai/docs/faq#how-can-i-resolve-cudnn-rnn-backward-error-for-rnn-or-lstm-network
+    # Please see https://captum.ai/docs/faq#how-can-i-resolve-cudnn-nn-backward-error-for-rnn-or-lstm-network
     # for more information.
     if accelerator == "cuda":
         th.backends.cudnn.enabled = False
@@ -138,6 +126,22 @@ def main(
             show_progress=True,
         ).abs()
 
+        with open(output_file, "a") as fp, lock:
+            k = "deep_lift"
+            v = attr["deep_lift"]
+            fp.write(str(seed) + ",")
+            fp.write(str(fold) + ",")
+            fp.write(k + ",")
+            fp.write(str(lambda_1) + ",")
+            fp.write(str(lambda_2) + ",")
+            fp.write(f"{aup(v, true_saliency):.4},")
+            fp.write(f"{aur(v, true_saliency):.4},")
+            fp.write(f"{information(v, true_saliency):.4},")
+            fp.write(f"{entropy(v, true_saliency):.4},")
+            fp.write(f"{roc_auc(v, true_saliency):.4},")
+            fp.write(f"{auprc(v, true_saliency):.4}")
+            fp.write("\n")
+        
     if "dyna_mask" in explainers:
         trainer = Trainer(
             max_epochs=1000,
@@ -145,10 +149,10 @@ def main(
             devices=device_id,
             log_every_n_steps=2,
             deterministic=deterministic,
-            # logger=TensorBoardLogger(
-            #     save_dir=".",
-            #     version=random.getrandbits(128),
-            # ),
+            logger=TensorBoardLogger(
+                save_dir=".",
+                version=random.getrandbits(128),
+            )
         )
         mask = MaskNet(
             forward_func=classifier,
@@ -159,7 +163,7 @@ def main(
             size_reg_factor_dilation=100,
             time_reg_factor=1.0,
         )
-        explainer = DynaMask(classifier)
+        explainer = DynaMask(dataset_name, classifier, seed, fold)
         _attr = explainer.attribute(
             x_test,
             additional_forward_args=(True,),
@@ -171,6 +175,22 @@ def main(
         print(f"Best keep ratio is {_attr[1]}")
         attr["dyna_mask"] = _attr[0].to(device)
 
+        with open(output_file, "a") as fp, lock:
+            k = "dyna_mask"
+            v = attr["dyna_mask"]
+            fp.write(str(seed) + ",")
+            fp.write(str(fold) + ",")
+            fp.write(k + ",")
+            fp.write(str(lambda_1) + ",")
+            fp.write(str(lambda_2) + ",")
+            fp.write(f"{aup(v, true_saliency):.4},")
+            fp.write(f"{aur(v, true_saliency):.4},")
+            fp.write(f"{information(v, true_saliency):.4},")
+            fp.write(f"{entropy(v, true_saliency):.4},")
+            fp.write(f"{roc_auc(v, true_saliency):.4},")
+            fp.write(f"{auprc(v, true_saliency):.4}")
+            fp.write("\n")
+
     if "extremal_mask" in explainers:
         trainer = Trainer(
             max_epochs=500,
@@ -178,12 +198,13 @@ def main(
             devices=device_id,
             log_every_n_steps=2,
             deterministic=deterministic,
-            # logger=TensorBoardLogger(
-            #     save_dir=".",
-            #     version=random.getrandbits(128),
-            # ),
+            logger=TensorBoardLogger(
+                save_dir=".",
+                version=random.getrandbits(128),
+            )
         )
         mask = ExtremalMaskNet(
+            dataset_name,
             forward_func=classifier,
             model=nn.Sequential(
                 RNN(
@@ -199,7 +220,7 @@ def main(
             optim="adam",
             lr=0.01,
         )
-        explainer = ExtremalMask(classifier)
+        explainer = ExtremalMask(classifier, seed, fold)
         _attr = explainer.attribute(
             x_test,
             additional_forward_args=(True,),
@@ -209,6 +230,22 @@ def main(
         )
         attr["extremal_mask"] = _attr.to(device)
 
+        with open(output_file, "a") as fp, lock:
+            k = "extremal_mask"
+            v = attr["extremal_mask"]
+            fp.write(str(seed) + ",")
+            fp.write(str(fold) + ",")
+            fp.write(k + ",")
+            fp.write(str(lambda_1) + ",")
+            fp.write(str(lambda_2) + ",")
+            fp.write(f"{aup(v, true_saliency):.4},")
+            fp.write(f"{aur(v, true_saliency):.4},")
+            fp.write(f"{information(v, true_saliency):.4},")
+            fp.write(f"{entropy(v, true_saliency):.4},")
+            fp.write(f"{roc_auc(v, true_saliency):.4},")
+            fp.write(f"{auprc(v, true_saliency):.4}")
+            fp.write("\n")
+
     if "fit" in explainers:
         generator = JointFeatureGeneratorNet(rnn_hidden_size=6)
         trainer = Trainer(
@@ -217,18 +254,37 @@ def main(
             devices=device_id,
             log_every_n_steps=10,
             deterministic=deterministic,
-            # logger=TensorBoardLogger(
-            #     save_dir=".",
-            #     version=random.getrandbits(128),
-            # ),
+            logger=TensorBoardLogger(
+                save_dir=".",
+                version=random.getrandbits(128),
+            )
         )
         explainer = Fit(
+            dataset_name,
             classifier,
             generator=generator,
             datamodule=hmm,
             trainer=trainer,
+            seed=seed,
+            fold=fold
         )
         attr["fit"] = explainer.attribute(x_test, show_progress=True)
+
+        with open(output_file, "a") as fp, lock:
+            k = "fit"
+            v = attr["fit"]
+            fp.write(str(seed) + ",")
+            fp.write(str(fold) + ",")
+            fp.write(k + ",")
+            fp.write(str(lambda_1) + ",")
+            fp.write(str(lambda_2) + ",")
+            fp.write(f"{aup(v, true_saliency):.4},")
+            fp.write(f"{aur(v, true_saliency):.4},")
+            fp.write(f"{information(v, true_saliency):.4},")
+            fp.write(f"{entropy(v, true_saliency):.4},")
+            fp.write(f"{roc_auc(v, true_saliency):.4},")
+            fp.write(f"{auprc(v, true_saliency):.4}")
+            fp.write("\n")
 
     if "gradient_shap" in explainers:
         explainer = TimeForwardTunnel(GradientShap(classifier.cpu()))
@@ -239,8 +295,24 @@ def main(
             stdevs=0.0001,
             task="binary",
             show_progress=True,
-        ).abs()
+        ).abs().to(device)
         classifier.to(device)
+
+        with open(output_file, "a") as fp, lock:
+            k = "gradient_shap"
+            v = attr["gradient_shap"]
+            fp.write(str(seed) + ",")
+            fp.write(str(fold) + ",")
+            fp.write(k + ",")
+            fp.write(str(lambda_1) + ",")
+            fp.write(str(lambda_2) + ",")
+            fp.write(f"{aup(v, true_saliency):.4},")
+            fp.write(f"{aur(v, true_saliency):.4},")
+            fp.write(f"{information(v, true_saliency):.4},")
+            fp.write(f"{entropy(v, true_saliency):.4},")
+            fp.write(f"{roc_auc(v, true_saliency):.4},")
+            fp.write(f"{auprc(v, true_saliency):.4}")
+            fp.write("\n")
 
     if "integrated_gradients" in explainers:
         explainer = TimeForwardTunnel(IntegratedGradients(classifier))
@@ -252,6 +324,22 @@ def main(
             show_progress=True,
         ).abs()
 
+        with open(output_file, "a") as fp, lock:
+            k = "integrated_gradients"
+            v = attr["integrated_gradients"]
+            fp.write(str(seed) + ",")
+            fp.write(str(fold) + ",")
+            fp.write(k + ",")
+            fp.write(str(lambda_1) + ",")
+            fp.write(str(lambda_2) + ",")
+            fp.write(f"{aup(v, true_saliency):.4},")
+            fp.write(f"{aur(v, true_saliency):.4},")
+            fp.write(f"{information(v, true_saliency):.4},")
+            fp.write(f"{entropy(v, true_saliency):.4},")
+            fp.write(f"{roc_auc(v, true_saliency):.4},")
+            fp.write(f"{auprc(v, true_saliency):.4}")
+            fp.write("\n")
+        
     if "lime" in explainers:
         explainer = TimeForwardTunnel(Lime(classifier))
         attr["lime"] = explainer.attribute(
@@ -260,6 +348,22 @@ def main(
             show_progress=True,
         ).abs()
 
+        with open(output_file, "a") as fp, lock:
+            k = "lime"
+            v = attr["lime"]
+            fp.write(str(seed) + ",")
+            fp.write(str(fold) + ",")
+            fp.write(k + ",")
+            fp.write(str(lambda_1) + ",")
+            fp.write(str(lambda_2) + ",")
+            fp.write(f"{aup(v, true_saliency):.4},")
+            fp.write(f"{aur(v, true_saliency):.4},")
+            fp.write(f"{information(v, true_saliency):.4},")
+            fp.write(f"{entropy(v, true_saliency):.4},")
+            fp.write(f"{roc_auc(v, true_saliency):.4},")
+            fp.write(f"{auprc(v, true_saliency):.4}")
+            fp.write("\n")
+    
     if "augmented_occlusion" in explainers:
         explainer = TimeForwardTunnel(
             TemporalAugmentedOcclusion(
@@ -274,47 +378,9 @@ def main(
             show_progress=True,
         ).abs()
 
-    if "occlusion" in explainers:
-        explainer = TimeForwardTunnel(TemporalOcclusion(classifier))
-        attr["occlusion"] = explainer.attribute(
-            x_test,
-            sliding_window_shapes=(1,),
-            baselines=x_train.mean(0, keepdim=True),
-            attributions_fn=abs,
-            task="binary",
-            show_progress=True,
-        ).abs()
-
-    if "retain" in explainers:
-        retain = RetainNet(
-            dim_emb=128,
-            dropout_emb=0.4,
-            dim_alpha=8,
-            dim_beta=8,
-            dropout_context=0.4,
-            dim_output=2,
-            loss="cross_entropy",
-        )
-        explainer = Retain(
-            datamodule=hmm,
-            retain=retain,
-            trainer=Trainer(
-                max_epochs=50,
-                accelerator=accelerator,
-                devices=device_id,
-                deterministic=deterministic,
-                # logger=TensorBoardLogger(
-                #     save_dir=".",
-                #     version=random.getrandbits(128),
-                # ),
-            ),
-        )
-        attr["retain"] = (
-            explainer.attribute(x_test, target=y_test).abs().to(device)
-        )
-
-    with open(output_file, "a") as fp, lock:
-        for k, v in attr.items():
+        with open(output_file, "a") as fp, lock:
+            k = "augmented_occlusion"
+            v = attr["augmented_occlusion"]
             fp.write(str(seed) + ",")
             fp.write(str(fold) + ",")
             fp.write(k + ",")
@@ -327,6 +393,95 @@ def main(
             fp.write(f"{roc_auc(v, true_saliency):.4},")
             fp.write(f"{auprc(v, true_saliency):.4}")
             fp.write("\n")
+        
+    if "occlusion" in explainers:
+        explainer = TimeForwardTunnel(TemporalOcclusion(classifier))
+        attr["occlusion"] = explainer.attribute(
+            x_test,
+            sliding_window_shapes=(1,),
+            baselines=x_train.mean(0, keepdim=True),
+            attributions_fn=abs,
+            task="binary",
+            show_progress=True,
+        ).abs()
+
+        with open(output_file, "a") as fp, lock:
+            k = "occlusion"
+            v = attr["occlusion"]
+            fp.write(str(seed) + ",")
+            fp.write(str(fold) + ",")
+            fp.write(k + ",")
+            fp.write(str(lambda_1) + ",")
+            fp.write(str(lambda_2) + ",")
+            fp.write(f"{aup(v, true_saliency):.4},")
+            fp.write(f"{aur(v, true_saliency):.4},")
+            fp.write(f"{information(v, true_saliency):.4},")
+            fp.write(f"{entropy(v, true_saliency):.4},")
+            fp.write(f"{roc_auc(v, true_saliency):.4},")
+            fp.write(f"{auprc(v, true_saliency):.4}")
+            fp.write("\n")
+        
+    if "retain" in explainers:
+        retain = RetainNet(
+            dim_emb=128,
+            dropout_emb=0.4,
+            dim_alpha=8,
+            dim_beta=8,
+            dropout_context=0.4,
+            dim_output=2,
+            loss="cross_entropy",
+        )
+        explainer = Retain(
+            dataset_name,
+            datamodule=hmm,
+            retain=retain,
+            trainer=Trainer(
+                max_epochs=50,
+                accelerator=accelerator,
+                devices=device_id,
+                deterministic=deterministic,
+                logger=TensorBoardLogger(
+                    save_dir=".",
+                    version=random.getrandbits(128),
+                )
+            ),
+            seed=seed,
+            fold=fold
+        )
+        attr["retain"] = (
+            explainer.attribute(x_test, target=y_test).abs().to(device)
+        )
+
+        with open(output_file, "a") as fp, lock:
+            k = "retain"
+            v = attr["retain"]
+            fp.write(str(seed) + ",")
+            fp.write(str(fold) + ",")
+            fp.write(k + ",")
+            fp.write(str(lambda_1) + ",")
+            fp.write(str(lambda_2) + ",")
+            fp.write(f"{aup(v, true_saliency):.4},")
+            fp.write(f"{aur(v, true_saliency):.4},")
+            fp.write(f"{information(v, true_saliency):.4},")
+            fp.write(f"{entropy(v, true_saliency):.4},")
+            fp.write(f"{roc_auc(v, true_saliency):.4},")
+            fp.write(f"{auprc(v, true_saliency):.4}")
+            fp.write("\n")
+        
+    # with open(output_file, "a") as fp, lock:
+    #     for k, v in attr.items():
+    #         fp.write(str(seed) + ",")
+    #         fp.write(str(fold) + ",")
+    #         fp.write(k + ",")
+    #         fp.write(str(lambda_1) + ",")
+    #         fp.write(str(lambda_2) + ",")
+    #         fp.write(f"{aup(v, true_saliency):.4},")
+    #         fp.write(f"{aur(v, true_saliency):.4},")
+    #         fp.write(f"{information(v, true_saliency):.4},")
+    #         fp.write(f"{entropy(v, true_saliency):.4},")
+    #         fp.write(f"{roc_auc(v, true_saliency):.4},")
+    #         fp.write(f"{auprc(v, true_saliency):.4}")
+    #         fp.write("\n")
 
 
 def parse_args():
@@ -388,16 +543,11 @@ def parse_args():
     parser.add_argument(
         "--output-file",
         type=str,
-        default="results.csv",
+        default="results_per_fold.csv",
         help="Where to save the results.",
     )
-    parser.add_argument(
-        "--retrain",
-        type=bool,
-        default="false",
-        help="Whether to retrain the classifier",
-    )
     return parser.parse_args()
+
 
 if __name__ == "__main__":
     args = parse_args()
@@ -410,5 +560,4 @@ if __name__ == "__main__":
         lambda_1=args.lambda_1,
         lambda_2=args.lambda_2,
         output_file=args.output_file,
-        retrain_classifier=args.retrain
     )

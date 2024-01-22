@@ -17,7 +17,7 @@ from typing import Callable, Union
 
 from tint.utils import _add_temporal_mask
 from .models import Retain as RetainModel, RetainNet
-
+from experiments.utils.get_model import get_model
 
 class Retain(PerturbationAttribution):
     """
@@ -55,6 +55,7 @@ class Retain(PerturbationAttribution):
 
     def __init__(
         self,
+        dataset_name: str,
         forward_func: Callable = None,
         retain: RetainNet = None,
         datamodule: LightningDataModule = None,
@@ -62,6 +63,8 @@ class Retain(PerturbationAttribution):
         labels: th.Tensor = None,
         trainer: Trainer = None,
         batch_size: int = 32,
+        seed = 42,
+        fold = 0,
     ) -> None:
         # If forward_func is not provided,
         # train retain model
@@ -95,9 +98,11 @@ class Retain(PerturbationAttribution):
                 pass
 
             # Train retain
-            trainer.fit(
-                retain, train_dataloaders=dataloader, datamodule=datamodule
-            )
+            retain = get_model(trainer, retain, 'retain', dataset_name, seed, fold, train_dataloaders=dataloader, datamodule=datamodule)
+            
+            # trainer.fit(
+            #     retain, train_dataloaders=dataloader, datamodule=datamodule
+            # )
 
             # Set to eval mode
             retain.eval()
