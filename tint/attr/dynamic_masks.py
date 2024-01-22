@@ -16,7 +16,7 @@ from typing import Any, Callable, Tuple
 
 from tint.utils import TensorDataset, _add_temporal_mask, default_collate
 from .models import MaskNet
-
+from experiments.utils.get_model import get_model
 
 class DynaMask(PerturbationAttribution):
     """
@@ -54,8 +54,12 @@ class DynaMask(PerturbationAttribution):
         >>> attr = explainer.attribute(inputs)
     """
 
-    def __init__(self, forward_func: Callable) -> None:
+    def __init__(self, dataset_name, forward_func: Callable, seed, fold) -> None:
         super().__init__(forward_func=forward_func)
+        
+        self.seed = seed
+        self.fold = fold
+        self.dataset_name = dataset_name
 
     @log_usage()
     def attribute(
@@ -178,7 +182,9 @@ class DynaMask(PerturbationAttribution):
         )
 
         # Fit model
-        trainer.fit(mask_net, train_dataloaders=dataloader)
+        mask_net = get_model(trainer, mask_net, 'dyna_mask', self.dataset_name, self.seed, self.fold, train_dataloaders=dataloader)
+        
+        # trainer.fit(mask_net, train_dataloaders=dataloader)
 
         # Set model to eval mode
         mask_net.eval()

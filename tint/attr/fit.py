@@ -19,7 +19,7 @@ from typing import Any, Callable, Tuple
 from tint.utils import get_progress_bars, _add_temporal_mask, _slice_to_time
 
 from .models import JointFeatureGeneratorNet
-
+from experiments.utils.get_model import get_model
 
 def kl_multilabel(p1, p2, reduction="none"):
     # treats each column as separate class and calculates KL over the class,
@@ -75,12 +75,15 @@ class Fit(PerturbationAttribution):
 
     def __init__(
         self,
+        dataset_name: str,
         forward_func: Callable,
         generator: JointFeatureGeneratorNet = None,
         datamodule: LightningDataModule = None,
         features: th.Tensor = None,
         trainer: Trainer = None,
         batch_size: int = 32,
+        seed = 42,
+        fold = 0
     ) -> None:
         super().__init__(forward_func=forward_func)
 
@@ -110,21 +113,26 @@ class Fit(PerturbationAttribution):
 
         # Init generator with feature size
         if features is None:
+            datamodule.setup('fit')
             shape = next(iter(datamodule.train_dataloader()))[0].shape
         else:
             shape = features.shape
         generator.net.init(feature_size=shape[-1])
 
         # Train generator
-        trainer.fit(
-            generator, train_dataloaders=dataloader, datamodule=datamodule
-        )
+        generator = get_model(trainer, generator, 'fit', dataset_name, seed, fold, train_dataloaders=dataloader, datamodule=datamodule)
+
+        # trainer.fit(
+        #     generator, train_dataloaders=dataloader, datamodule=datamodule
+        # )
 
         # Set to eval mode
         generator.eval()
 
         # Extract generator model from pytorch lightning model
         self.generator = generator.net
+        self.seed = seed
+        self.fold = fold
 
     @log_usage()
     def attribute(

@@ -1,18 +1,6 @@
 import copy
 import torch as th
 
-
-
-import os
-def get_model(check_name, trainer, model, train_dataloaders, seed, rerun_all=False):
-    checkpoint=str(seed)+"_"+check_name+'.ckpt'
-    if os.path.exists(checkpoint) and not rerun_all:
-        model.load_state_dict(th.load(checkpoint))
-    else:
-       trainer.fit(model, train_dataloaders=train_dataloaders)
-       th.save(model.state_dict(), checkpoint)
-    return model
-
 from captum.attr._utils.attribution import PerturbationAttribution
 from captum.log import log_usage
 from captum._utils.common import (
@@ -34,7 +22,7 @@ from typing import Any, Callable, Tuple
 
 from tint.utils import TensorDataset, _add_temporal_mask, default_collate
 from .models import ExtremalMaskNet
-
+from experiments.utils.get_model import get_model
 
 class ExtremalMask(PerturbationAttribution):
     """
@@ -67,8 +55,11 @@ class ExtremalMask(PerturbationAttribution):
         >>> attr = explainer.attribute(inputs)
     """
 
-    def __init__(self, forward_func: Callable) -> None:
+    def __init__(self, dataset_name, forward_func: Callable, seed, fold) -> None:
         super().__init__(forward_func=forward_func)
+        self.seed = seed
+        self.fold = fold
+        self.dataset_name = dataset_name
 
     @log_usage()
     def attribute(
@@ -81,8 +72,7 @@ class ExtremalMask(PerturbationAttribution):
         mask_net: ExtremalMaskNet = None,
         batch_size: int = 32,
         temporal_additional_forward_args: Tuple[bool] = None,
-        return_temporal_attributions: bool = False,
-        seed:int=42
+        return_temporal_attributions: bool = False
     ) -> TensorOrTupleOfTensorsGeneric:
         """
         Attribute method.
@@ -241,8 +231,9 @@ class ExtremalMask(PerturbationAttribution):
         )
 
         # Fit model
-        # trainer.fit(mask_net, train_dataloaders=train_dataloaders)
-        mask_net=get_model(check_name="extremal_mask_net",trainer=trainer, model=mask_net, train_dataloaders=dataloader, seed=seed)
+        mask_net = get_model(trainer, mask_net, 'extremal_mask', self.dataset_name, self.seed, self.fold, lambda_1 = mask_net.lambda_1, lambda_2 = mask_net.lambda_2, train_dataloaders=dataloader)
+
+        # trainer.fit(mask_net, train_dataloaders=dataloader)
 
         # Set model to eval mode and cast it to device
         mask_net.eval()

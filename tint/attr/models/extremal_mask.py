@@ -152,7 +152,7 @@ class ExtremalMaskNet(Net):
         lr: float = 0.001,
         lr_scheduler: Union[dict, str] = None,
         lr_scheduler_args: dict = None,
-        l2: float = 0.0,
+        l2: float = 0.0
     ):
         mask = ExtremalMaskNN(
             forward_func=forward_func,
