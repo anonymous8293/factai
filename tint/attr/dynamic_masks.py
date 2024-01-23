@@ -72,6 +72,7 @@ class DynaMask(PerturbationAttribution):
         temporal_additional_forward_args: Tuple[bool] = None,
         return_temporal_attributions: bool = False,
         return_best_ratio: bool = False,
+        device:str="",
     ) -> TensorOrTupleOfTensorsGeneric:
         """
         Attribute method.
@@ -180,6 +181,10 @@ class DynaMask(PerturbationAttribution):
             batch_size=batch_size,
             collate_fn=default_collate,
         )
+
+        if(device == "cuda"):
+            mask_net = mask_net.to(device)
+
 
         # Fit model
         mask_net = get_model(trainer, mask_net, 'dyna_mask', self.dataset_name, self.seed, self.fold, train_dataloaders=dataloader)

@@ -38,6 +38,8 @@ from tint.models import MLP, RNN
 
 from experiments.utils.get_model import get_model
 from experiments.hmm.classifier import StateClassifierNet
+import pickle
+
 
 
 def main(
@@ -48,7 +50,9 @@ def main(
     deterministic: bool = False,
     lambda_1: float = 1.0,
     lambda_2: float = 1.0,
-    output_file: str = "results_per_fold.csv",
+    output_file: str = "hmm_results_per_fold.csv",
+    preservation_mode: bool=True,
+    preservation_test:bool=False
 ):
     dataset_name = 'hmm'
 
@@ -85,10 +89,7 @@ def main(
         accelerator=accelerator,
         devices=device_id,
         deterministic=deterministic,
-        logger=TensorBoardLogger(
-            save_dir=".",
-            version=random.getrandbits(128),
-        )
+        logger=False
     )
     
     classifier = get_model(trainer, classifier, 'classifier', dataset_name, seed, fold, lambda_1=lambda_1, lambda_2=lambda_2, datamodule=hmm)
@@ -147,12 +148,8 @@ def main(
             max_epochs=1000,
             accelerator=accelerator,
             devices=device_id,
-            log_every_n_steps=2,
             deterministic=deterministic,
-            logger=TensorBoardLogger(
-                save_dir=".",
-                version=random.getrandbits(128),
-            )
+            logger=False
         )
         mask = MaskNet(
             forward_func=classifier,
@@ -179,6 +176,9 @@ def main(
             k = "dyna_mask"
             v = attr["dyna_mask"]
             fp.write(str(seed) + ",")
+            if(preservation_test):
+                fp.write(str(preservation_mode)+ ",")
+                fp.write(str(not preservation_mode)+ ",")
             fp.write(str(fold) + ",")
             fp.write(k + ",")
             fp.write(str(lambda_1) + ",")
@@ -196,15 +196,12 @@ def main(
             max_epochs=500,
             accelerator=accelerator,
             devices=device_id,
-            log_every_n_steps=2,
             deterministic=deterministic,
-            logger=TensorBoardLogger(
-                save_dir=".",
-                version=random.getrandbits(128),
-            )
+            logger=False
         )
         mask = ExtremalMaskNet(
             forward_func=classifier,
+            preservation_mode=preservation_mode,
             model=nn.Sequential(
                 RNN(
                     input_size=x_test.shape[-1],
@@ -251,12 +248,8 @@ def main(
             max_epochs=300,
             accelerator=accelerator,
             devices=device_id,
-            log_every_n_steps=10,
             deterministic=deterministic,
-            logger=TensorBoardLogger(
-                save_dir=".",
-                version=random.getrandbits(128),
-            )
+            logger=False
         )
         explainer = Fit(
             dataset_name,
@@ -439,10 +432,7 @@ def main(
                 accelerator=accelerator,
                 devices=device_id,
                 deterministic=deterministic,
-                logger=TensorBoardLogger(
-                    save_dir=".",
-                    version=random.getrandbits(128),
-                )
+                logger=False
             ),
             seed=seed,
             fold=fold
@@ -489,7 +479,7 @@ def parse_args():
         "--explainers",
         type=str,
         default=[
-            "deep_lift",
+            #"deep_lift",
             "dyna_mask",
             "extremal_mask",
             "fit",
@@ -542,8 +532,13 @@ def parse_args():
     parser.add_argument(
         "--output-file",
         type=str,
-        default="results_per_fold.csv",
+        default="hmm_results_per_fold.csv",
         help="Where to save the results.",
+    )
+    parser.add_argument(
+        "--deletion-mode",
+        action="store_false",
+        help="By default uses extremal_mask preservation game. When specified, it runs for the deletion game.",
     )
     return parser.parse_args()
 
@@ -559,4 +554,5 @@ if __name__ == "__main__":
         lambda_1=args.lambda_1,
         lambda_2=args.lambda_2,
         output_file=args.output_file,
+        preservation_mode=args.deletion_mode
     )

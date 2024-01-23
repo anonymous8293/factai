@@ -170,6 +170,8 @@ class ExtremalMaskNet(Net):
             l2=l2,
         )
 
+        print("preservation mode is ", preservation_mode)
+
         self.preservation_mode = preservation_mode
         self.lambda_1 = lambda_1
         self.lambda_2 = lambda_2

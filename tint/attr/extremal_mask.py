@@ -55,7 +55,7 @@ class ExtremalMask(PerturbationAttribution):
         >>> attr = explainer.attribute(inputs)
     """
 
-    def __init__(self, dataset_name, forward_func: Callable, seed, fold) -> None:
+    def __init__(self, dataset_name, forward_func: Callable, seed: int, fold: int) -> None:
         super().__init__(forward_func=forward_func)
         self.seed = seed
         self.fold = fold
@@ -231,7 +231,7 @@ class ExtremalMask(PerturbationAttribution):
         )
 
         # Fit model
-        mask_net = get_model(trainer, mask_net, 'extremal_mask', self.dataset_name, self.seed, self.fold, lambda_1 = mask_net.lambda_1, lambda_2 = mask_net.lambda_2, train_dataloaders=dataloader)
+        mask_net = get_model(trainer, mask_net, 'extremal_mask', self.dataset_name, self.seed, self.fold, lambda_1 = mask_net.lambda_1, lambda_2 = mask_net.lambda_2, train_dataloaders=dataloader, preservation_mode=mask_net.preservation_mode)
 
         # trainer.fit(mask_net, train_dataloaders=dataloader)
 

@@ -111,19 +111,20 @@ def _base_metric(
 
         # Get topk indices for each element in the batch
         # It is assumed that the batch is on the first dimension
+        device="cpu"
         topk_indices = tuple(
             torch.topk(
                 attr.reshape(len(attr), -1),
                 int(attr.reshape(len(attr), -1).shape[-1] * topk),
                 sorted=False,
                 largest=largest,
-            ).indices.to(attr.device)
+            ).indices.to(device)
             for attr in _attributions
         )
 
         # Set topk indices to inputs device
         topk_indices = tuple(
-            topk.to(input.device) for topk, input in zip(topk_indices, _inputs)
+            topk.to(device) for topk, input in zip(topk_indices, _inputs)
         )
 
         # Replace topk values with baseline
@@ -135,10 +136,11 @@ def _base_metric(
                 for inp, topk_idx in zip(inputs_pert, topk_indices)
             )
         else:
+            
             _baselines = tuple(
                 baseline
                 if isinstance(baseline, (int, float))
-                else baseline.reshape(len(baseline), -1).gather(-1, topk_idx)
+                else baseline.to("cpu").reshape(len(baseline), -1).gather(-1, topk_idx.to("cpu") )
                 for baseline, topk_idx in zip(_baselines, topk_indices)
             )
             inputs_pert = tuple(
