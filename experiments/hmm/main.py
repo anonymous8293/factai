@@ -15,6 +15,10 @@ from pytorch_lightning import Trainer, seed_everything
 from typing import List
 from pytorch_lightning.loggers import TensorBoardLogger
 
+from experiments.utils.get_model import get_model
+from experiments.hmm.classifier import StateClassifierNet
+
+
 from tint.attr import (
     DynaMask,
     ExtremalMask,
@@ -40,26 +44,14 @@ from tint.metrics.white_box import (
     auprc,
 )
 from tint.models import MLP, RNN
+import logging
 
-
-from experiments.utils.get_model import get_model
-from experiments.hmm.classifier import StateClassifierNet
-
-
-def get_model(check_name, trainer, model, data_module, seed, retrain=False):
-    checkpoint = "models/hmm_" + str(seed) + "_" + check_name + ".ckpt"
-
-    if os.path.exists(checkpoint) and not retrain:
-        model.load_state_dict(th.load(checkpoint))
-    else:
-        trainer.fit(model, datamodule=data_module)
-        th.save(model.state_dict(), checkpoint)
-
-    return model
-
-
-from experiments.utils.get_model import get_model
-from experiments.hmm.classifier import StateClassifierNet
+logging.basicConfig(
+    level=logging.WARNING,
+    filename="hmm.log",
+    format="%(asctime)s - %(name)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 
 def save_explainer(explainer, mlp=None, explainer_name="explainer"):
@@ -71,18 +63,6 @@ def save_explainer(explainer, mlp=None, explainer_name="explainer"):
         pickle.dump(explainer, f)
 
 
-def get_model(check_name, trainer, model, data_module, seed, retrain):
-    checkpoint = "models/hmm_" + str(seed) + "_" + check_name + ".ckpt"
-
-    if os.path.exists(checkpoint) and not retrain:
-        model.load_state_dict(th.load(checkpoint))
-    else:
-        trainer.fit(model, datamodule=data_module)
-        th.save(model.state_dict(), checkpoint)
-
-    return model
-
-
 def main(
     explainers: List[str],
     device: str = "cpu",
@@ -91,9 +71,8 @@ def main(
     deterministic: bool = False,
     lambda_1: float = 1.0,
     lambda_2: float = 1.0,
-    retrain_classifier: bool = False,
+    retrain: bool = False,
     output_file: str = "results_per_fold.csv",
-    retrain_classifier: bool = False,
 ):
     dataset_name = "hmm"
 
@@ -113,8 +92,6 @@ def main(
     # Load data
     hmm = HMM(n_folds=5, fold=fold, seed=seed)
     print(hmm.true_saliency(split="test"))
-
-    raise Exception()
 
     # Create classifier
     classifier = StateClassifierNet(
@@ -251,7 +228,7 @@ def main(
 
     if "extremal_mask" in explainers:
         trainer = Trainer(
-            max_epochs=200,
+            max_epochs=20,
             accelerator=accelerator,
             devices=device_id,
             log_every_n_steps=2,
@@ -277,6 +254,7 @@ def main(
             optim="adam",
             lr=0.01,
         )
+        logging.warn(f"data, {x_test[0].T[0][:20]}")
         explainer = ExtremalMask(dataset_name, classifier, seed, fold)
         _attr = explainer.attribute(
             x_test,
@@ -284,14 +262,19 @@ def main(
             trainer=trainer,
             mask_net=mask,
             batch_size=100,
+            retrain=retrain,
         )
+        logging.warn(f"_attr, {_attr[0].T[0][:20]}")
+        logging.warn(f"mask.net.mask, {mask.net.mask[0].T[0][:20]}")
+        logging.warn(f"true_saliency, {true_saliency[0].T[0][:20]}")
+
         attr["extremal_mask"] = _attr.to(device)
-        # save_explainer(_attr, explainer_name=f"{seed}_hmm_extremal_attr")
-        # save_explainer(mask, explainer_name=f"{seed}_hmm_extremal_mask_net")
-        # save_explainer(
-        #     mask.net.model, explainer_name=f"{seed}_hmm_extremal_perturbation_net"
-        # )
-        # save_explainer(explainer, explainer_name=f"{seed}_hmm_extremal_explainer")
+        save_explainer(_attr, explainer_name=f"{seed}_hmm_extremal2_attr")
+        save_explainer(mask, explainer_name=f"{seed}_hmm_extremal2_mask_net")
+        save_explainer(
+            mask.net.model, explainer_name=f"{seed}_hmm_extremal2_perturbation_net"
+        )
+        save_explainer(explainer, explainer_name=f"{seed}_hmm_extremal2_explainer")
 
         with open(output_file, "a") as fp, lock:
             k = "extremal_mask"
@@ -614,7 +597,7 @@ def parse_args():
     parser.add_argument(
         "--retrain",
         action="store_true",
-        help="Whether to retrain the classifier",
+        help="Whether to retrain the explainer",
     )
     return parser.parse_args()
 
@@ -630,5 +613,5 @@ if __name__ == "__main__":
         lambda_1=args.lambda_1,
         lambda_2=args.lambda_2,
         output_file=args.output_file,
-        retrain_classifier=args.retrain,
+        retrain=args.retrain,
     )

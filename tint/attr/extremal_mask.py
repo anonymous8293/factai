@@ -24,6 +24,7 @@ from tint.utils import TensorDataset, _add_temporal_mask, default_collate
 from .models import ExtremalMaskNet
 from experiments.utils.get_model import get_model
 
+
 class ExtremalMask(PerturbationAttribution):
     """
     Extremal masks.
@@ -72,7 +73,8 @@ class ExtremalMask(PerturbationAttribution):
         mask_net: ExtremalMaskNet = None,
         batch_size: int = 32,
         temporal_additional_forward_args: Tuple[bool] = None,
-        return_temporal_attributions: bool = False
+        return_temporal_attributions: bool = False,
+        retrain: bool = False,
     ) -> TensorOrTupleOfTensorsGeneric:
         """
         Attribute method.
@@ -197,9 +199,7 @@ class ExtremalMask(PerturbationAttribution):
             trainer = copy.deepcopy(trainer)
 
         # Assert only one input, as the Retain only accepts one
-        assert (
-            len(inputs) == 1
-        ), "Multiple inputs are not accepted for this method"
+        assert len(inputs) == 1, "Multiple inputs are not accepted for this method"
         data = inputs[0]
         baseline = baselines[0]
 
@@ -231,7 +231,18 @@ class ExtremalMask(PerturbationAttribution):
         )
 
         # Fit model
-        mask_net = get_model(trainer, mask_net, 'extremal_mask', self.dataset_name, self.seed, self.fold, lambda_1 = mask_net.lambda_1, lambda_2 = mask_net.lambda_2, train_dataloaders=dataloader)
+        mask_net = get_model(
+            trainer,
+            mask_net,
+            "extremal_mask",
+            self.dataset_name,
+            self.seed,
+            self.fold,
+            lambda_1=mask_net.lambda_1,
+            lambda_2=mask_net.lambda_2,
+            train_dataloaders=dataloader,
+            retrain=retrain,
+        )
 
         # trainer.fit(mask_net, train_dataloaders=dataloader)
 
@@ -244,9 +255,7 @@ class ExtremalMask(PerturbationAttribution):
 
         # Reshape representation if temporal attributions
         if return_temporal_attributions:
-            attributions = attributions.reshape(
-                (-1, data.shape[1]) + data.shape[1:]
-            )
+            attributions = attributions.reshape((-1, data.shape[1]) + data.shape[1:])
 
         # Reshape as a tuple
         attributions = (attributions,)
