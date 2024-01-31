@@ -24,6 +24,7 @@ out
 
 #checkpoints
 *.ckpt
+*.pt
 
 env/*
 lightning_logs/*

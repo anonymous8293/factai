@@ -1,0 +1,3 @@
+#install environment
+#move stuff to ./experiments/pickles
+#move data to 

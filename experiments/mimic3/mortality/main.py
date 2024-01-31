@@ -50,7 +50,6 @@ def output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, 
         for i, baselines in enumerate([x_avg, 0.0]):
             for topk in areas:
                 for k, v in attr.items():
-                    print("\n\n---- Finished ",k,"----")
                     acc = accuracy(
                         cpu_classifier,
                         cpu_x_test,
@@ -193,20 +192,22 @@ def main(
     attr = dict()
 
     if "deep_lift" in explainers:
-        explainer = TimeForwardTunnel(DeepLift(classifier))
-        attr["deep_lift"] = explainer.attribute(
-            x_test,
-            baselines=x_test * 0,
-            task="binary",
-            show_progress=True,
-        ).abs()
-
         model_name="deep_lift" 
-        save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-        save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-
-
+        attr[model_name]=get_explainer( model_name+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        if(attr[model_name] is None):
+            print("no explainer found!!!")
+            explainer = TimeForwardTunnel(DeepLift(classifier))
+            attr["deep_lift"] = explainer.attribute(
+                x_test,
+                baselines=x_test * 0,
+                task="binary",
+                show_progress=True,
+            ).abs()
+        
+        # save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        # save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+        print("finished analyzing ", model_name, "output to ",output_file)
 
     if "dyna_mask" in explainers:
         trainer = Trainer(
@@ -234,7 +235,7 @@ def main(
             mask_net=mask,
             batch_size=100,
             return_best_ratio=True,
-            device="cuda"
+            device=device
         )
         print(f"Best keep ratio is {_attr[1]}")
         attr["dyna_mask"] = _attr[0].to(device)
@@ -246,6 +247,8 @@ def main(
         # save_explainer( mask.net.model,   model_name+"_perturbation_net", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
         
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+
+        print("finished analyzing ", model_name, "output to ",output_file)
 
     if "extremal_mask" in explainers:
         trainer = Trainer(
@@ -288,13 +291,15 @@ def main(
         save_explainer( mask,             model_name+"_mask",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
         save_explainer( mask.net.model,   model_name+"_perturbation_net", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+        print("finished analyzing ", model_name, "output to ",output_file)
 
 
     if "extremal_mask_alt" in explainers:
-        print("Starting extremal_mask_alt")
-        model_name="extremal_mask_alt"
-        attr[model_name]=get_explainer( "model_name"+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-        if(explainer is attr[model_name]):           
+        model_name="extremal_mask"
+        attr[model_name]=None
+        # attr[model_name]=get_explainer( model_name+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        if(attr[model_name] is None):      
+            print("explainer is None!!!!")     
             trainer = Trainer(
                 max_epochs=500,
                 accelerator=accelerator,
@@ -329,13 +334,14 @@ def main(
                 batch_size=100,
             )
             attr["extremal_mask"] = _attr.to(device)
-            save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-            save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-            save_explainer( mask,             model_name+"_mask",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-            save_explainer( mask.net.model,   model_name+"_perturbation_net", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            # save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            # save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            # save_explainer( mask,             model_name+"_mask",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            # save_explainer( mask.net.model,   model_name+"_perturbation_net", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
         else:
             print("explainer is not none")
-        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)    
+        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+        print("finished analyzing ", model_name, "output to ",output_file)  
 
 
 
@@ -377,6 +383,7 @@ def main(
         save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
         save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+        print("finished analyzing ", model_name, "output to ",output_file)  
 
     if "integrated_gradients" in explainers:
         explainer = TimeForwardTunnel(IntegratedGradients(classifier))
@@ -393,6 +400,7 @@ def main(
         save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
         save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+        print("finished analyzing ", model_name, "output to ",output_file)  
 
     if "lime" in explainers:
         explainer = TimeForwardTunnel(Lime(classifier))
@@ -407,6 +415,7 @@ def main(
         save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
 
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+        print("finished analyzing ", model_name, "output to ",output_file)  
 
     if "augmented_occlusion" in explainers:
         explainer = TimeForwardTunnel(
@@ -423,8 +432,8 @@ def main(
         ).abs()
 
         model_name="augmented_occlusion"
-        save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-        save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        # save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        # save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
 
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
 
@@ -444,6 +453,7 @@ def main(
         save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
 
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+        print("finished analyzing ", model_name, "output to ",output_file)  
 
     if "retain" in explainers:
         retain = RetainNet(
@@ -478,6 +488,7 @@ def main(
         save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
         save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+        print("finished analyzing ", model_name, "output to ",output_file)  
 
 
 
@@ -491,8 +502,8 @@ def parse_args():
         "--explainers",
         type=str,
         default=[
-            "extremal_mask_alt"
-        #    "deep_lift",
+            # "extremal_mask"
+           "deep_lift",
         #    "dyna_mask",
             # # "extremal_mask",
             # "augmented_occlusion",

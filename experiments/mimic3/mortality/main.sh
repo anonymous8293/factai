@@ -1,7 +1,7 @@
 #!/bin/bash
 
 processes=${processes:-5}
-device=${device:-cuda}
+device=${device:-cpu}
 seed=${seed:-42}
 
 while [ $# -gt 0 ]
@@ -24,6 +24,7 @@ function ctrl_c() {
 # for fold in $(seq 1 2)
 for fold in 1
 do
+
   python -m experiments.mimic3.mortality.main --device "$device" --fold "$fold" --seed "$seed" --deterministic &
 
   # Support lower versions

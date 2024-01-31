@@ -10,7 +10,7 @@ import pickle
 def get_explainer_checkpoint( model_name, data_name, seed, fold, lambda_1 = None, lambda_2 = None, retrain = False, preservation_mode = True):
     checkpoint_dir = 'experiments/pickles'
     if model_name != 'extremal_mask':
-        checkpoint_path = f'{checkpoint_dir}/{data_name}_{model_name}_{seed}_{fold}.ckpt'
+        checkpoint_path = f'{checkpoint_dir}/{data_name}_{model_name}_{seed}_{fold}.pt'
     elif model_name == 'extremal_mask' and (lambda_1 is None or lambda_2 is None):
         raise ValueError('must specify lambda 1 and lambda 2 values for extremal mask explainer')
     else:
@@ -31,13 +31,17 @@ def get_explainer(model_name, data_name, seed, fold, lambda_1 = None, lambda_2 =
             attr = pickle.load(f)
         return attr
     else:
+        print("Could not find model at ",checkpoint_path)
+    
         return None
 
 def save_explainer( explainer, model_name, data_name, seed, fold, lambda_1 = None, lambda_2 = None, retrain = False, preservation_mode = True):
-    checkpoint_path=get_explainer_checkpoint( model_name, data_name, seed, fold, lambda_1 , lambda_2 , retrain , preservation_mode)
-    if retrain or not os.path.exists(checkpoint_path) :
-        with open(f"{checkpoint_path}", "wb") as f:
-            pickle.dump(explainer, f)
+    print("temporarily not saving explainers")
+    return None
+    # checkpoint_path=get_explainer_checkpoint( model_name, data_name, seed, fold, lambda_1 , lambda_2 , retrain , preservation_mode)
+    # if retrain or not os.path.exists(checkpoint_path) :
+    #     with open(f"{checkpoint_path}", "wb") as f:
+    #         pickle.dump(explainer, f)
 
 
 def get_model(trainer, model, model_name, data_name, seed, fold, train_dataloaders = None, datamodule = None, lambda_1 = None, lambda_2 = None, retrain = False, preservation_mode = True):
