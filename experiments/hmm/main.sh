@@ -1,7 +1,7 @@
 #!/bin/bash
 
 processes=${processes:-5}
-device=${device:-cuda}
+device=${device:-cpu}
 seed=${seed:-42}
 outputfile=${outputfile:-hmm_results_per_fold.csv}
 preservation=${preservation:-true}

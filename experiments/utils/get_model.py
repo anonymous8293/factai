@@ -7,6 +7,87 @@ import pickle
 #     with open(f"{explainer_name}.pkl", "wb") as f:
 #         pickle.dump(explainer, f)
 
+
+
+def get_classifier(
+    experiment: str,
+    seed: int or str,
+    fold: int or str,
+    checkpoint_dir: str = "experiments/checkpoints/",
+):
+    classifier = None
+    if experiment == "hmm":
+        # From HMM experiments
+        classifier = StateClassifierNet(
+            feature_size=3,
+            n_state=2,
+            hidden_size=200,
+            regres=True,
+            loss="cross_entropy",
+            lr=0.0001,
+            l2=1e-3,
+        )
+    elif experiment == "mimic3":
+        # From MIMIC-III mortality experiment
+        classifier = MimicClassifierNet(
+            feature_size=31,
+            n_state=2,
+            hidden_size=200,
+            regres=True,
+            loss="cross_entropy",
+            lr=0.0001,
+            l2=1e-3,
+        )
+
+    path = f"{checkpoint_dir}{experiment}_classifier_{seed}_{fold}.ckpt"
+    classifier.load_state_dict(th.load(path))
+    return classifier
+
+
+# def save_explainer(explainer, explainer_name="explainer"):
+#     with open(f"{explainer_name}.pkl", "wb") as f:
+#         pickle.dump(explainer, f)
+
+
+def load_explainer2(
+    dataset_name: str,
+    method: str,
+    pickle_dir: str = "experiments/checkpoints/",
+    seed: int = 42,
+    fold: int = 0,
+):
+    def load_pickle_file(path: str):
+        try:
+            return th.load(f"{path}.pt")
+        except FileNotFoundError:
+            pass
+
+        try:
+            return th.load(f"{path}.pkl")
+        except FileNotFoundError:
+            pass
+
+        try:
+            return th.load(f"{path}.ckpt")
+        except FileNotFoundError:
+            print(f"--------- Could not find and load {path}")
+
+    attr = load_pickle_file(f"{pickle_dir}{dataset_name}_{method}_attr_{seed}_{fold}")
+    # explainer = load_pickle_file(
+    #     f"{pickle_dir}{dataset_name}_{method}_explainer_{seed}_{fold}"
+    # )
+    # mask_net = load_pickle_file(
+    #     f"{pickle_dir}{dataset_name}_{method}_mask_{seed}_{fold}"
+    # )
+
+    
+    return attr
+
+
+
+
+#### LUKE CODE ####
+
 def get_explainer_checkpoint( model_name, data_name, seed, fold, lambda_1 = None, lambda_2 = None, retrain = False, preservation_mode = True):
     checkpoint_dir = 'experiments/pickles'
     if model_name != 'extremal_mask':

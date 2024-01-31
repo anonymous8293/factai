@@ -478,9 +478,9 @@ def parse_args():
         "--explainers",
         type=str,
         default=[
-            #"deep_lift",
-            "dyna_mask",
             "extremal_mask",
+            "deep_lift",
+            "dyna_mask",
             "fit",
             "gradient_shap",
             "integrated_gradients",

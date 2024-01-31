@@ -1,1 +1,1 @@
-Seed,Fold,Baseline,Topk,Explainer,Lambda_1,Lambda_2,Accuracy,Comprehensiveness,Cross Entropy,Log Odds,Sufficiency
+42,0,extremal_mask,1.0,1.0,0.5185,0.4334,1.645e+05,5.472e+03,0.6453,0.4637
