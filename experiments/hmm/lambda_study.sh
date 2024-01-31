@@ -1,8 +1,9 @@
 #!/bin/bash
 
 processes=${processes:-5}
-device=${device:-cpu}
+device=${device:-cuda}
 seed=${seed:-42}
+outputfile=${outputfile:-lambda_study_per_fold.csv}
 
 while [ $# -gt 0 ]
 do
@@ -25,9 +26,13 @@ for lambda_1 in 0.01 0.1 1. 10. 100.
 do
   for lambda_2 in 0.01 0.1 1. 10. 100.
   do
-    for fold in $(seq 0 4)
+    for fold in $(seq 0 0)
     do
-      python main.py --explainers extremal_mask --device "$device" --fold "$fold" --seed "$seed" --lambda-1 "$lambda_1" --lambda-2 "$lambda_2" --output-file lambda_study.csv &
+
+      if [[ $lambda_1 == 0.01 && $lambda_2 != 100 && $fold != 4 ]]; then
+        continue
+      fi
+      python -m experiments.hmm.main --explainers extremal_mask --device "$device" --fold "$fold" --seed "$seed" --lambda-1 "$lambda_1" --lambda-2 "$lambda_2" --output-file "$outputfile" --deterministic &
 
       # Support lower versions
       if ((BASH_VERSINFO[0] >= 4)) && ((BASH_VERSINFO[1] >= 3))

@@ -8,18 +8,19 @@
 #SBATCH --ntasks=1
 #SBATCH --time=10:00:00
 #SBATCH --mem=32000M
-#SBATCH --output=output/hmm_experiment_%A.out
+#SBATCH --output=hmm_experiment_%A.out
 
 module purge
 module load 2022
 module load Anaconda3/2022.05
 source activate factai
-cd $HOME/factai/
+cd $HOME/original_repo/time_interpret/experiments/hmm/
+
 
 rm -f results.csv
-python ./experiments/hmm/reset.py -e main
-# Run for all explainers
-python ./experiments/hmm/main.py --device cuda --fold 1
+python ./reset.py -e main
+python ./main.py --device cpu --explainers extremal_mask --deterministic
+
 
 current_time=$(date "+%Y.%m.%d-%H.%M.%S")
-cp results.csv ./experiments/hmm/reproducibility_results/hmm_${current_time}_results.csv
+cp results.csv ./results/${current_time}_results.csv

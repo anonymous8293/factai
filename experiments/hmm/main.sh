@@ -1,8 +1,10 @@
 #!/bin/bash
 
 processes=${processes:-5}
-device=${device:-cpu}
+device=${device:-cuda}
 seed=${seed:-42}
+outputfile=${outputfile:-hmm_results_per_fold.csv}
+preservation=${preservation:-true}
 
 while [ $# -gt 0 ]
 do
@@ -23,7 +25,16 @@ function ctrl_c() {
 
 for fold in $(seq 0 4)
 do
-  python main.py --device "$device" --fold "$fold" --seed "$seed" &
+  if [[ $preservation = true ]]; then 
+    python -m experiments.hmm.main --device "$device" --fold "$fold" --seed "$seed" --deterministic --output-file "$outputfile"&
+  else 
+    python -m experiments.hmm.main --device "$device" --fold "$fold" --seed "$seed" --deletion-mode --explainers extremal_mask --output-file "$outputfile"&
+  fi
+  # if [[ $fold -eq 4 ]]; then
+  #   python -m experiments.hmm.main --device "$device" --fold "$fold" --seed "$seed" --deterministic --explainers fit gradient_shap integrated_gradients augmented_occlusion occlusion retain &
+  # else
+  #   python -m experiments.hmm.main --device "$device" --fold "$fold" --seed "$seed" --deterministic --explainers augmented_occlusion occlusion retain &
+  # fi
 
   # Support lower versions
   if ((BASH_VERSINFO[0] >= 4)) && ((BASH_VERSINFO[1] >= 3))

@@ -1,0 +1,29 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_mig
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=9
+#SBATCH --gpus-per-node=1
+#SBATCH --job-name=HMM_lambda_sh
+#SBATCH --ntasks=1
+#SBATCH --time=5:00:00
+#SBATCH --mem=32000M
+#SBATCH --output=output/hmm_lambda_sh_%A.out
+
+module purge
+module load 2022
+module load Anaconda3/2022.05
+source activate factai
+cd $HOME/original_repo/time_interpret/
+
+rm -f hmm_lambda_study_per_fold.csv
+rm -f hmm_lambda_study_per_fold_averaged.csv
+python -m experiments.hmm.reset -e lambda_study
+echo "starting assesment"
+./experiments/hmm/lambda_study.sh --processes 1 --outputfile hmm_lambda_study_per_fold.csv
+python -m experiments.utils.average_results --results-file hmm_lambda_study_per_fold.csv
+echo "finished assessment"
+
+current_time=$(date "+%Y.%m.%d-%H.%M.%S")
+cp hmm_lambda_study_per_fold.csv ./experiments/hmm/reproducibility_results/hmm_${current_time}_lambda_study_per_fold.csv
+cp hmm_lambda_study_per_fold_averaged.csv ./experiments/hmm/reproducibility_results/hmm_${current_time}_lambda_study_per_fold_averaged.csv

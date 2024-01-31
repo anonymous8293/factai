@@ -8,7 +8,6 @@ from argparse import ArgumentParser
 from captum.attr import DeepLift, GradientShap, IntegratedGradients, Lime
 from pytorch_lightning import Trainer, seed_everything
 from typing import List
-from pytorch_lightning.loggers import TensorBoardLogger
 
 from tint.attr import (
     DynaMask,

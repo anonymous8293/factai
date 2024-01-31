@@ -7,7 +7,6 @@ import torch.nn as nn
 from argparse import ArgumentParser
 from captum.attr import DeepLift, GradientShap, IntegratedGradients, Lime
 from pytorch_lightning import Trainer, seed_everything
-from pytorch_lightning.loggers import TensorBoardLogger
 from typing import List
 
 from tint.attr import (
@@ -34,312 +33,55 @@ from tint.metrics import (
     sufficiency,
 )
 from tint.models import MLP, RNN
+from experiments.utils.get_model import get_model, get_explainer, save_explainer
 
 from experiments.mimic3.mortality.classifier import MimicClassifierNet
 
 
-def main(
-    explainers: List[str],
-    areas: list,
-    device: str = "cpu",
-    fold: int = 0,
-    seed: int = 42,
-    deterministic: bool = False,
-    lambda_1: float = 1.0,
-    lambda_2: float = 1.0,
-    output_file: str = "results.csv",
-):
-    # If deterministic, seed everything
-    if deterministic:
-        seed_everything(seed=seed, workers=True)
-
-    # Get accelerator and device
-    accelerator = device.split(":")[0]
-    device_id = 1
-    if len(device.split(":")) > 1:
-        device_id = [int(device.split(":")[1])]
-
-    # Create lock
-    lock = mp.Lock()
-
-    # Load data
-    mimic3 = Mimic3(n_folds=5, fold=fold, seed=seed)
-
-    # Create classifier
-    classifier = MimicClassifierNet(
-        feature_size=31,
-        n_state=2,
-        hidden_size=200,
-        regres=True,
-        loss="cross_entropy",
-        lr=0.0001,
-        l2=1e-3,
-    )
-
-    # Train classifier
-    trainer = Trainer(
-        max_epochs=100,
-        accelerator=accelerator,
-        devices=device_id,
-        deterministic=deterministic,
-        logger=TensorBoardLogger(
-            save_dir=".",
-            version=random.getrandbits(128),
-        ),
-    )
-    trainer.fit(classifier, datamodule=mimic3)
-
-    # Get data for explainers
-    with lock:
-        x_train = mimic3.preprocess(split="train")["x"].to(device)
-        x_test = mimic3.preprocess(split="test")["x"].to(device)
-        y_test = mimic3.preprocess(split="test")["y"].to(device)
-
-    # Switch to eval
-    classifier.eval()
-
-    # Set model to device
-    classifier.to(device)
-
-    # Disable cudnn if using cuda accelerator.
-    # Please see https://captum.ai/docs/faq#how-can-i-resolve-cudnn-rnn-backward-error-for-rnn-or-lstm-network
-    # for more information.
-    if accelerator == "cuda":
-        th.backends.cudnn.enabled = False
-
-    # Create dict of attributions
-    attr = dict()
-
-    if "deep_lift" in explainers:
-        explainer = TimeForwardTunnel(DeepLift(classifier))
-        attr["deep_lift"] = explainer.attribute(
-            x_test,
-            baselines=x_test * 0,
-            task="binary",
-            show_progress=True,
-        ).abs()
-
-    if "dyna_mask" in explainers:
-        trainer = Trainer(
-            max_epochs=1000,
-            accelerator=accelerator,
-            devices=device_id,
-            log_every_n_steps=2,
-            deterministic=deterministic,
-            logger=TensorBoardLogger(
-                save_dir=".",
-                version=random.getrandbits(128),
-            ),
-        )
-        mask = MaskNet(
-            forward_func=classifier,
-            perturbation="fade_moving_average",
-            keep_ratio=list(np.arange(0.1, 0.7, 0.1)),
-            deletion_mode=True,
-            size_reg_factor_init=0.1,
-            size_reg_factor_dilation=10000,
-            time_reg_factor=0.0,
-            loss="cross_entropy",
-        )
-        explainer = DynaMask(classifier)
-        _attr = explainer.attribute(
-            x_test,
-            trainer=trainer,
-            mask_net=mask,
-            batch_size=100,
-            return_best_ratio=True,
-        )
-        print(f"Best keep ratio is {_attr[1]}")
-        attr["dyna_mask"] = _attr[0].to(device)
-
-    if "extremal_mask" in explainers:
-        trainer = Trainer(
-            max_epochs=500,
-            accelerator=accelerator,
-            devices=device_id,
-            log_every_n_steps=2,
-            deterministic=deterministic,
-            logger=TensorBoardLogger(
-                save_dir=".",
-                version=random.getrandbits(128),
-            ),
-        )
-        mask = ExtremalMaskNet(
-            forward_func=classifier,
-            model=nn.Sequential(
-                RNN(
-                    input_size=x_test.shape[-1],
-                    rnn="gru",
-                    hidden_size=x_test.shape[-1],
-                    bidirectional=True,
-                ),
-                MLP([2 * x_test.shape[-1], x_test.shape[-1]]),
-            ),
-            lambda_1=lambda_1,
-            lambda_2=lambda_2,
-            loss="cross_entropy",
-            optim="adam",
-            lr=0.01,
-        )
-        explainer = ExtremalMask(classifier)
-        _attr = explainer.attribute(
-            x_test,
-            trainer=trainer,
-            mask_net=mask,
-            batch_size=100,
-        )
-        attr["extremal_mask"] = _attr.to(device)
-
-    if "fit" in explainers:
-        generator = JointFeatureGeneratorNet(rnn_hidden_size=6)
-        trainer = Trainer(
-            max_epochs=300,
-            accelerator=accelerator,
-            devices=device_id,
-            log_every_n_steps=10,
-            deterministic=deterministic,
-            logger=TensorBoardLogger(
-                save_dir=".",
-                version=random.getrandbits(128),
-            ),
-        )
-        explainer = Fit(
-            classifier,
-            generator=generator,
-            datamodule=mimic3,
-            trainer=trainer,
-        )
-        attr["fit"] = explainer.attribute(x_test, show_progress=True)
-
-    if "gradient_shap" in explainers:
-        explainer = TimeForwardTunnel(GradientShap(classifier.cpu()))
-        attr["gradient_shap"] = explainer.attribute(
-            x_test.cpu(),
-            baselines=th.cat([x_test.cpu() * 0, x_test.cpu()]),
-            n_samples=50,
-            stdevs=0.0001,
-            task="binary",
-            show_progress=True,
-        ).abs()
-        classifier.to(device)
-
-    if "integrated_gradients" in explainers:
-        explainer = TimeForwardTunnel(IntegratedGradients(classifier))
-        attr["integrated_gradients"] = explainer.attribute(
-            x_test,
-            baselines=x_test * 0,
-            internal_batch_size=200,
-            task="binary",
-            show_progress=True,
-        ).abs()
-
-    if "lime" in explainers:
-        explainer = TimeForwardTunnel(Lime(classifier))
-        attr["lime"] = explainer.attribute(
-            x_test,
-            task="binary",
-            show_progress=True,
-        ).abs()
-
-    if "augmented_occlusion" in explainers:
-        explainer = TimeForwardTunnel(
-            TemporalAugmentedOcclusion(
-                classifier, data=x_train, n_sampling=10, is_temporal=True
-            )
-        )
-        attr["augmented_occlusion"] = explainer.attribute(
-            x_test,
-            sliding_window_shapes=(1,),
-            attributions_fn=abs,
-            task="binary",
-            show_progress=True,
-        ).abs()
-
-    if "occlusion" in explainers:
-        explainer = TimeForwardTunnel(TemporalOcclusion(classifier))
-        attr["occlusion"] = explainer.attribute(
-            x_test,
-            sliding_window_shapes=(1,),
-            baselines=x_train.mean(0, keepdim=True),
-            attributions_fn=abs,
-            task="binary",
-            show_progress=True,
-        ).abs()
-
-    if "retain" in explainers:
-        retain = RetainNet(
-            dim_emb=128,
-            dropout_emb=0.4,
-            dim_alpha=8,
-            dim_beta=8,
-            dropout_context=0.4,
-            dim_output=2,
-            temporal_labels=False,
-            loss="cross_entropy",
-        )
-        explainer = Retain(
-            datamodule=mimic3,
-            retain=retain,
-            trainer=Trainer(
-                max_epochs=50,
-                accelerator=accelerator,
-                devices=device_id,
-                deterministic=deterministic,
-                logger=TensorBoardLogger(
-                    save_dir=".",
-                    version=random.getrandbits(128),
-                ),
-            ),
-        )
-        attr["retain"] = (
-            explainer.attribute(x_test, target=y_test).abs().to(device)
-        )
-
-    # Classifier and x_test to cpu
-    classifier.to("cpu")
-    x_test = x_test.to("cpu")
-
-    # Compute x_avg for the baseline
-    x_avg = x_test.mean(1, keepdim=True).repeat(1, x_test.shape[1], 1)
+def output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device):
+    
+    
+    cpu_classifier=classifier.to("cpu")
+    cpu_x_test = x_test.to("cpu")
 
     # Dict for baselines
     baselines_dict = {0: "Average", 1: "Zeros"}
-
     with open(output_file, "a") as fp, lock:
         for i, baselines in enumerate([x_avg, 0.0]):
             for topk in areas:
                 for k, v in attr.items():
+                    print("\n\n---- Finished ",k,"----")
                     acc = accuracy(
-                        classifier,
-                        x_test,
+                        cpu_classifier,
+                        cpu_x_test,
                         attributions=v.cpu(),
                         baselines=baselines,
                         topk=topk,
                     )
                     comp = comprehensiveness(
-                        classifier,
-                        x_test,
+                        cpu_classifier,
+                        cpu_x_test,
                         attributions=v.cpu(),
                         baselines=baselines,
                         topk=topk,
                     )
                     ce = cross_entropy(
-                        classifier,
-                        x_test,
+                        cpu_classifier,
+                        cpu_x_test,
                         attributions=v.cpu(),
                         baselines=baselines,
                         topk=topk,
                     )
                     l_odds = log_odds(
-                        classifier,
-                        x_test,
+                        cpu_classifier,
+                        cpu_x_test,
                         attributions=v.cpu(),
                         baselines=baselines,
                         topk=topk,
                     )
                     suff = sufficiency(
-                        classifier,
-                        x_test,
+                        cpu_classifier,
+                        cpu_x_test,
                         attributions=v.cpu(),
                         baselines=baselines,
                         topk=topk,
@@ -358,6 +100,389 @@ def main(
                     fp.write(f"{l_odds:.4},")
                     fp.write(f"{suff:.4}")
                     fp.write("\n")
+    attr.clear()
+
+    classifier=classifier.to(device)
+    x_test = x_test.to(device)
+
+def main(
+    explainers: List[str],
+    areas: list,
+    device: str = "cpu",
+    fold: int = 0,
+    seed: int = 42,
+    deterministic: bool = False,
+    lambda_1: float = 1.0,
+    lambda_2: float = 1.0,
+    output_file: str = "results.csv",
+    preservation_mode: bool = True
+):
+    dataset_name = 'mimic3'
+    retrain = False
+
+    # If deterministic, seed everything
+    if deterministic:
+        seed_everything(seed=seed, workers=True)
+
+    # Get accelerator and device
+    accelerator = device.split(":")[0]
+    device_id = 1
+    if len(device.split(":")) > 1:
+        device_id = [int(device.split(":")[1])]
+
+    # Create lock
+    lock = mp.Lock()
+
+    # Load data
+    mimic3 = Mimic3(n_folds=5, fold=fold, seed=seed)
+
+
+
+    # Create classifier
+    classifier = MimicClassifierNet(
+        feature_size=31,
+        n_state=2,
+        hidden_size=200,
+        regres=True,
+        loss="cross_entropy",
+        lr=0.0001,
+        l2=1e-3,
+    )
+
+    # Train classifier
+    trainer = Trainer(
+        max_epochs=100,
+        accelerator=accelerator,
+        devices=device_id,
+        deterministic=deterministic,
+        logger=False,
+    )
+    classifier = get_model(trainer, classifier, 'classifier', dataset_name, seed, fold, lambda_1=lambda_1, lambda_2=lambda_2, datamodule=mimic3)
+
+    # Get data for explainers
+    with lock:
+        x_train = mimic3.preprocess(split="train")["x"].to(device)
+        x_test = mimic3.preprocess(split="test")["x"].to(device)
+        y_test = mimic3.preprocess(split="test")["y"].to(device)
+
+        print("x_train shape", x_train.size())
+        print("x_test shape", x_train.size())
+        print("y_test shape", x_train.size())
+
+    # Switch to eval
+    classifier.eval()
+
+    # Set model to device
+    classifier.to(device)
+
+    
+
+    # Disable cudnn if using cuda accelerator.
+    # Please see https://captum.ai/docs/faq#how-can-i-resolve-cudnn-rnn-backward-error-for-rnn-or-lstm-network
+    # for more information.
+    if accelerator == "cuda":
+        th.backends.cudnn.enabled = False
+
+
+    #for printing out
+    # Compute x_avg for the baseline
+    x_avg = x_test.mean(1, keepdim=True).repeat(1, x_test.to("cpu").shape[1], 1)
+        # Classif:ier and x_test to cpu
+
+    # Create dict of attributions
+    attr = dict()
+
+    if "deep_lift" in explainers:
+        explainer = TimeForwardTunnel(DeepLift(classifier))
+        attr["deep_lift"] = explainer.attribute(
+            x_test,
+            baselines=x_test * 0,
+            task="binary",
+            show_progress=True,
+        ).abs()
+
+        model_name="deep_lift" 
+        save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+
+
+        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+
+    if "dyna_mask" in explainers:
+        trainer = Trainer(
+            max_epochs=1000,
+            accelerator=accelerator,
+            devices=device_id,
+            log_every_n_steps=2,
+            deterministic=deterministic,
+            logger=False,
+        )
+        mask = MaskNet(
+            forward_func=classifier,
+            perturbation="fade_moving_average",
+            keep_ratio=list(np.arange(0.1, 0.7, 0.1)),
+            deletion_mode=True,
+            size_reg_factor_init=0.1,
+            size_reg_factor_dilation=10000,
+            time_reg_factor=0.0,
+            loss="cross_entropy",
+        )
+        explainer = DynaMask(dataset_name, classifier.to(device), seed, fold)
+        _attr = explainer.attribute(
+            x_test.to(device),
+            trainer=trainer,
+            mask_net=mask,
+            batch_size=100,
+            return_best_ratio=True,
+            device="cuda"
+        )
+        print(f"Best keep ratio is {_attr[1]}")
+        attr["dyna_mask"] = _attr[0].to(device)
+
+        model_name="dyna_mask" 
+        save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        save_explainer( mask,             model_name+"_mask",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        # save_explainer( mask.net.model,   model_name+"_perturbation_net", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        
+        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+
+    if "extremal_mask" in explainers:
+        trainer = Trainer(
+            max_epochs=500,
+            accelerator=accelerator,
+            devices=device_id,
+            log_every_n_steps=2,
+            deterministic=deterministic,
+            logger=False,
+        )
+        mask = ExtremalMaskNet(
+            forward_func=classifier,
+            preservation_mode=preservation_mode,
+            model=nn.Sequential(
+                RNN(
+                    input_size=x_test.shape[-1],
+                    rnn="gru",
+                    hidden_size=x_test.shape[-1],
+                    bidirectional=True,
+                ),
+                MLP([2 * x_test.shape[-1], x_test.shape[-1]]),
+            ),
+            lambda_1=lambda_1,
+            lambda_2=lambda_2,
+            loss="cross_entropy",
+            optim="adam",
+            lr=0.01,
+        )
+        explainer = ExtremalMask(dataset_name, classifier, seed, fold)
+        _attr = explainer.attribute(
+            x_test,
+            trainer=trainer,
+            mask_net=mask,
+            batch_size=100,
+        )
+        attr["extremal_mask"] = _attr.to(device)
+        model_name="extremal_mask"
+        save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        save_explainer( mask,             model_name+"_mask",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        save_explainer( mask.net.model,   model_name+"_perturbation_net", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+
+
+    if "extremal_mask_alt" in explainers:
+        print("Starting extremal_mask_alt")
+        model_name="extremal_mask_alt"
+        attr[model_name]=get_explainer( "model_name"+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        if(explainer is attr[model_name]):           
+            trainer = Trainer(
+                max_epochs=500,
+                accelerator=accelerator,
+                devices=device_id,
+                log_every_n_steps=2,
+                deterministic=deterministic,
+                logger=False,
+            )
+            mask = ExtremalMaskNet(
+                forward_func=classifier,
+                preservation_mode=preservation_mode,
+                model=nn.Sequential(
+                    RNN(
+                        input_size=x_test.shape[-1],
+                        rnn="gru",
+                        hidden_size=x_test.shape[-1],
+                        bidirectional=True,
+                    ),
+                    MLP([2 * x_test.shape[-1], x_test.shape[-1]]),
+                ),
+                lambda_1=lambda_1,
+                lambda_2=lambda_2,
+                loss="cross_entropy",
+                optim="adam",
+                lr=0.01,
+            )
+            explainer = ExtremalMask(dataset_name, classifier, seed, fold)
+            _attr = explainer.attribute(
+                x_test,
+                trainer=trainer,
+                mask_net=mask,
+                batch_size=100,
+            )
+            attr["extremal_mask"] = _attr.to(device)
+            save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer( mask,             model_name+"_mask",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer( mask.net.model,   model_name+"_perturbation_net", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        else:
+            print("explainer is not none")
+        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)    
+
+
+
+
+    if "fit" in explainers:
+        generator = JointFeatureGeneratorNet(rnn_hidden_size=6)
+        trainer = Trainer(
+            max_epochs=300,
+            accelerator=accelerator,
+            devices=device_id,
+            log_every_n_steps=10,
+            deterministic=deterministic,
+            logger=False,
+        )
+        explainer = Fit(
+            dataset_name,
+            classifier,
+            generator=generator,
+            datamodule=mimic3,
+            trainer=trainer,
+            seed=seed,
+            fold=fold
+        )
+        attr["fit"] = explainer.attribute(x_test, show_progress=True)
+        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+
+    if "gradient_shap" in explainers:
+        explainer = TimeForwardTunnel(GradientShap(classifier.cpu()))
+        attr["gradient_shap"] = explainer.attribute(
+            x_test.cpu(),
+            baselines=th.cat([x_test.cpu() * 0, x_test.cpu()]),
+            n_samples=50,
+            stdevs=0.0001,
+            task="binary",
+            show_progress=True,
+        ).abs().to(device)
+        classifier.to(device)
+        model_name="gradient_shap"
+        save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+
+    if "integrated_gradients" in explainers:
+        explainer = TimeForwardTunnel(IntegratedGradients(classifier))
+        attr["integrated_gradients"] = explainer.attribute(
+            x_test,
+            baselines=x_test * 0,
+            internal_batch_size=200,
+            task="binary",
+            show_progress=True,
+        ).abs()
+
+
+        model_name="integrated_gradients"
+        save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+
+    if "lime" in explainers:
+        explainer = TimeForwardTunnel(Lime(classifier))
+        attr["lime"] = explainer.attribute(
+            x_test,
+            task="binary",
+            show_progress=True,
+        ).abs()
+
+        model_name="lime"
+        save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+
+        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+
+    if "augmented_occlusion" in explainers:
+        explainer = TimeForwardTunnel(
+            TemporalAugmentedOcclusion(
+                classifier, data=x_train, n_sampling=10, is_temporal=True
+            )
+        )
+        attr["augmented_occlusion"] = explainer.attribute(
+            x_test,
+            sliding_window_shapes=(1,),
+            attributions_fn=abs,
+            task="binary",
+            show_progress=True,
+        ).abs()
+
+        model_name="augmented_occlusion"
+        save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+
+        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+
+    if "occlusion" in explainers:
+        explainer = TimeForwardTunnel(TemporalOcclusion(classifier))
+        attr["occlusion"] = explainer.attribute(
+            x_test,
+            sliding_window_shapes=(1,),
+            baselines=x_train.mean(0, keepdim=True),
+            attributions_fn=abs,
+            task="binary",
+            show_progress=True,
+        ).abs()
+
+        model_name="occlusion"
+        save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+
+        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+
+    if "retain" in explainers:
+        retain = RetainNet(
+            dim_emb=128,
+            dropout_emb=0.4,
+            dim_alpha=8,
+            dim_beta=8,
+            dropout_context=0.4,
+            dim_output=2,
+            temporal_labels=False,
+            loss="cross_entropy",
+        )
+        explainer = Retain(
+            dataset_name,
+            datamodule=mimic3,
+            retain=retain,
+            trainer=Trainer(
+                max_epochs=50,
+                accelerator=accelerator,
+                devices=device_id,
+                deterministic=deterministic,
+                logger=False
+            ),
+            seed=seed,
+            fold=fold
+        )
+        attr["retain"] = (
+            explainer.attribute(x_test, target=y_test).abs().to(device)
+        )
+
+        model_name="retain"
+        save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+
+
+
+
+
 
 
 def parse_args():
@@ -366,16 +491,14 @@ def parse_args():
         "--explainers",
         type=str,
         default=[
-            "deep_lift",
-            "dyna_mask",
-            "extremal_mask",
-            "fit",
-            "gradient_shap",
-            "integrated_gradients",
-            "lime",
-            "augmented_occlusion",
-            "occlusion",
-            "retain",
+            "extremal_mask_alt"
+        #    "deep_lift",
+        #    "dyna_mask",
+            # # "extremal_mask",
+            # "augmented_occlusion",
+            # "occlusion",
+            # "retain",
+            # "integrated_gradients",
         ],
         nargs="+",
         metavar="N",
@@ -434,7 +557,7 @@ def parse_args():
     parser.add_argument(
         "--output-file",
         type=str,
-        default="results.csv",
+        default="mimic_results_per_fold.csv",
         help="Where to save the results.",
     )
     return parser.parse_args()

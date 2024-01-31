@@ -5,14 +5,15 @@ from argparse import ArgumentParser
 
 
 def main(experiment: str):
+    print("experiment is -",experiment,"-")
     if experiment == "main":
-        with open("results.csv", "w") as fp:
+        with open("mimic_results_per_fold.csv", "w") as fp:
             fp.write(
                 "Seed,Fold,Baseline,Topk,Explainer,Lambda_1,Lambda_2,Accuracy,Comprehensiveness,Cross Entropy,"
                 "Log Odds,Sufficiency\n"
             )
 
-    if experiment == "lambda_study":
+    elif experiment == "lambda_study":
         with open("lambda_study.csv", "w") as fp:
             fp.write(
                 "Seed,Fold,Baseline,Topk,Explainer,Lambda_1,Lambda_2,Accuracy,Comprehensiveness,Cross Entropy,"

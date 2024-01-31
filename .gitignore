@@ -23,7 +23,8 @@ lightning_logs
 out
 
 #checkpoints
-.ckpt
+*.ckpt
 
-env/
-lightning_logs/
+env/*
+lightning_logs/*
+*.csv

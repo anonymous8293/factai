@@ -1,0 +1,15 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_mig
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=9
+#SBATCH --gpus=1
+#SBATCH --job-name=download_data
+#SBATCH --ntasks=1
+#SBATCH --time=1:00:00
+#SBATCH --mem=32000M
+#SBATCH --output=output/download_data_%A.out
+
+
+cd $HOME/data
+wget -r -N -c -np --user sebastian-arias1 --password physionetpass12345  https://physionet.org/files/mimic3-carevue/1.4/

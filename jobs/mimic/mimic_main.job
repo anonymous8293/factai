@@ -1,0 +1,40 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_mig
+#SBATCH --gres=gpu
+#SBATCH --cpus-per-task=9
+#SBATCH --gpus-per-node=1
+
+#SBATCH --job-name=MIMIC_Experiment
+#SBATCH --ntasks=1
+#SBATCH --time=00:15:00
+#SBATCH --mem=32000M
+#SBATCH --output=output/mimic_experiment_%A.out
+
+module purge
+module load 2022
+module load Anaconda3/2022.05
+source activate factai
+
+REPO=$HOME/original_repo/time_interpret
+SCRIPT_DIR=${REPO}
+cd ${REPO}
+
+#delete and reset
+rm -f mimic_results_per_fold.csv
+rm -f mimic_results_per_fold_averaged.csv
+python -m experiments.mimic3.mortality.reset -e main
+
+
+echo "starting assesment"
+./experiments/mimic3/mortality/main.sh --processes 1
+#python -m experiments.utils.average_results
+echo "finished assessment"
+
+current_time=$(date "+%Y.%m.%d-%H.%M.%S")
+
+cp mimic_results_per_fold.csv ./experiments/mimic3/mortality/reproducibility_results/mimic_${current_time}_results_per_fold.csv
+cp mimic_results_per_fold_averaged.csv ./experiments/mimic3/mortality/reproducibility_results/mimic_${current_time}_results_per_fold_averaged.csv
+
+current_time=$(date "+%Y.%m.%d-%H.%M.%S")
+cp results.csv ./results/${current_time}_results.csv
