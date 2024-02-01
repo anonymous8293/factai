@@ -7,6 +7,21 @@ import pickle
 #     with open(f"{explainer_name}.pkl", "wb") as f:
 #         pickle.dump(explainer, f)
 
+def load_explainer2(
+    dataset_name: str,
+    method: str,
+    pickle_dir: str = "experiments/checkpoints/",
+    seed: int = 42,
+    fold: int = 0,
+):
+    def load_pickle_file(path: str):
+        try:
+            return th.load(f"{path}.pt")
+        except FileNotFoundError:
+            print(f"--------- Could not find and load {path}")
+    return load_pickle_file(f"{pickle_dir}{dataset_name}_{method}_attr_{seed}_{fold}")
+
+
 def get_explainer_checkpoint(model_name, data_name, seed, fold, lambda_1 = None, lambda_2 = None, retrain = False, preservation_mode = True):
     checkpoint_dir = 'experiments/pickles'
     if model_name != 'extremal_mask':
