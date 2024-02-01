@@ -1,11 +1,8 @@
 @echo off
-del results.csv
 
-py -m experiments.hmm.reset -e main
-py -m experiments.hmm.main --explainers extremal_mask --device cuda --fold 1
+del hmm_results_per_fold.csv
+python -m experiments.hmm.reset -e main
 
-for /f "tokens=1-6 delims=/:. " %%a in ('echo %date% %time%') do (
-    set current_time=%%c.%%b.%%a-%%d.%%e.%%f
+for /l %%x in (0, 1, 4) do (
+    python -m experiments.hmm.main --explainers dyna_mask --fold %%x
 )
-
-copy results.csv .\experiments\hmm\reproducibility_results\hmm_%current_time%_extremal_results.csv
