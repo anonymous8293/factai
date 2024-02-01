@@ -8,6 +8,7 @@ from argparse import ArgumentParser
 from captum.attr import DeepLift, GradientShap, IntegratedGradients, Lime
 from pytorch_lightning import Trainer, seed_everything
 from typing import List
+from tint.utils.perturbations import compute_perturbations
 
 from tint.attr import (
     DynaMask,
@@ -34,8 +35,11 @@ from tint.metrics import (
 )
 from tint.models import MLP, RNN
 from experiments.utils.get_model import get_model, get_explainer, save_explainer, load_explainer2
+from tint.utils.model_loading import load_explainer
+from tint.utils.perturbations import compute_alternative, compute_alternative2
 
 from experiments.mimic3.mortality.classifier import MimicClassifierNet
+
 
 
 def output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device):
@@ -170,7 +174,9 @@ def main(
 
         # print("x_train shape", x_train.size())
         # print("x_test shape", x_train.size())
-        # print("y_test shape", x_train.size())
+        # print("y_t# est shape", x_train.size())
+
+    print("y_test mean", th.mean(y_test.float()))
 
     # Switch to eval
     classifier.eval()
@@ -218,7 +224,6 @@ def main(
         model_name="dyna_mask" 
         attr[model_name]=load_explainer2( dataset_name, model_name, pickle_folder, seed, fold)
         if(attr[model_name] is None):
-        
             trainer = Trainer(
                 max_epochs=1000,
                 accelerator=accelerator,
@@ -298,51 +303,28 @@ def main(
 
 
     if "extremal_mask_alt" in explainers:
-        model_name="extremal_mask"
+        model_name="extremal_mask_alt"
         attr[model_name]=None
-        # attr[model_name]=get_explainer( model_name+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-        if(attr[model_name] is None):      
-            print("explainer is None!!!!")     
-            trainer = Trainer(
-                max_epochs=500,
-                accelerator=accelerator,
-                devices=device_id,
-                log_every_n_steps=2,
-                deterministic=deterministic,
-                logger=False,
-            )
-            mask = ExtremalMaskNet(
-                forward_func=classifier,
-                preservation_mode=preservation_mode,
-                model=nn.Sequential(
-                    RNN(
-                        input_size=x_test.shape[-1],
-                        rnn="gru",
-                        hidden_size=x_test.shape[-1],
-                        bidirectional=True,
-                    ),
-                    MLP([2 * x_test.shape[-1], x_test.shape[-1]]),
-                ),
-                lambda_1=lambda_1,
-                lambda_2=lambda_2,
-                loss="cross_entropy",
-                optim="adam",
-                lr=0.01,
-            )
-            explainer = ExtremalMask(dataset_name, classifier, seed, fold)
-            _attr = explainer.attribute(
-                x_test,
-                trainer=trainer,
-                mask_net=mask,
-                batch_size=100,
-            )
-            attr["extremal_mask"] = _attr.to(device)
-            # save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-            # save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-            # save_explainer( mask,             model_name+"_mask",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-            # save_explainer( mask.net.model,   model_name+"_perturbation_net", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-        else:
-            print("explainer is not none")
+        inputs_mimic=x_test
+        (extremal_mask_attr_mimic,extremal_mask_explainer_mimic,extremal_mask_mask_net_mimic) = load_explainer(dataset_name="mimic3", pickle_dir="experiments/pickles/", method="extremal_mask", seed=seed, fold=fold)
+        (extremal_mimic_batch,extremal_perturbation_mimic, extremal_mask_mimic, extremal_x1_mimic, extremal_x2_mimic,) = compute_perturbations(
+            data=inputs_mimic,mask_net=extremal_mask_mask_net_mimic,perturb_net=extremal_mask_mask_net_mimic.net.model,batch_idx=0)
+        alt_mask = compute_alternative(extremal_mimic_batch, extremal_mask_mimic, extremal_perturbation_mimic)
+        attr[model_name]=alt_mask
+        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+        print("finished analyzing ", model_name, "output to ",output_file)  
+
+
+    if "extremal_mask_alt2" in explainers:
+        model_name="extremal_mask_alt2"
+        attr[model_name]=None
+        inputs_mimic=x_test
+        (extremal_mask_attr_mimic,extremal_mask_explainer_mimic,extremal_mask_mask_net_mimic) = load_explainer(dataset_name="mimic3", pickle_dir="experiments/pickles/", method="extremal_mask", seed=seed, fold=fold)
+        (extremal_mimic_batch,extremal_perturbation_mimic, extremal_mask_mimic, extremal_x1_mimic, extremal_x2_mimic,) = compute_perturbations(
+            data=inputs_mimic,mask_net=extremal_mask_mask_net_mimic,perturb_net=extremal_mask_mask_net_mimic.net.model,batch_idx=0)
+        alt_mask = compute_alternative2(extremal_mimic_batch, extremal_mask_mimic, extremal_perturbation_mimic)
+        
+        attr[model_name]=alt_mask
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
         print("finished analyzing ", model_name, "output to ",output_file)  
 

@@ -7,6 +7,8 @@ from typing import Callable, Union
 
 from tint.models import Net
 
+from tint.utils.perturbations import compute_alternative
+
 
 class ExtremalMaskNN(nn.Module):
     """
