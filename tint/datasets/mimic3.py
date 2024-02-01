@@ -60,6 +60,7 @@ eth_list = ["white", "black", "hispanic", "asian", "other"]
 EPS = 1e-5
 
 
+#/Users/lukecadigan/courses/fact/mimic3/misc/physionet.org/files/mimic3-carevue/1.4
 class Mimic3(DataModule):
     r"""
     MIMIC-III dataset.
@@ -210,10 +211,10 @@ class Mimic3(DataModule):
         den = pd.read_sql_query(denquery, con)
 
         # drop patients with less than 48 hour
-        den["los_icu_hr"] = (den.outtime - den.intime).astype("timedelta64[h]")
+        den["los_icu_hr"] = (den.outtime - den.intime).astype("timedelta64[s]") /pd.Timedelta(hours=1)
         den = den[(den.los_icu_hr >= 48)]
         den = den[(den.age < 300)]
-        den.drop("los_icu_hr", 1, inplace=True)
+        den.drop(columns=["los_icu_hr"])
 
         # clean up
         den["adult_icu"] = np.where(
@@ -237,7 +238,7 @@ class Mimic3(DataModule):
         ] = "other"
 
         den.drop(
-            [
+            columns=[
                 "hospstay_seq",
                 "los_icu",
                 "icustay_seq",
@@ -248,7 +249,6 @@ class Mimic3(DataModule):
                 "outtime",
                 "first_careunit",
             ],
-            1,
             inplace=True,
         )
 
