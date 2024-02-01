@@ -6,19 +6,19 @@ from argparse import ArgumentParser
 
 def main(experiment: str):
     if experiment == "main":
-        with open("results.csv", "w") as fp:
+        with open("hmm_results_per_fold.csv", "w") as fp:
             fp.write(
                 "Seed,Fold,Explainer,Lambda_1,Lambda_2,AUP,AUR,Information,Entropy,AUROC,AUPRC\n"
             )
 
     elif experiment == "lambda_study":
-        with open("lambda_study.csv", "w") as fp:
+        with open("hmm_lambda_study_per_fold.csv", "w") as fp:
             fp.write(
                 "Seed,Fold,Explainer,Lambda_1,Lambda_2,AUP,AUR,Information,Entropy,AUROC,AUPRC\n"
             )
 
     elif experiment == "extremal_mask_params":
-        with open("extremal_mask_params.csv", "w") as fp:
+        with open("hmm_extremal_mask_params.csv", "w") as fp:
             fp.write("Metric,Model\n")
 
     else:

@@ -38,6 +38,7 @@ from tint.metrics.white_box import (
 from tint.models import MLP, RNN
 
 from experiments.utils.get_model import get_model
+from experiments.utils.model_utils import get_perturbed_data
 from experiments.hmm.classifier import StateClassifierNet
 import pickle
 
@@ -53,7 +54,6 @@ def main(
     lambda_2: float = 1.0,
     output_file: str = "hmm_results_per_fold.csv",
     preservation_mode: bool=True,
-    preservation_test:bool=False,
     dataset_name: str = 'hmm',
     hidden_size: int = 200
 ):
@@ -128,6 +128,7 @@ def main(
             task="binary",
             show_progress=True,
         ).abs()
+        
 
         with open(output_file, "a") as fp, lock:
             k = "deep_lift"
@@ -178,9 +179,6 @@ def main(
             k = "dyna_mask"
             v = attr["dyna_mask"]
             fp.write(str(seed) + ",")
-            if(preservation_test):
-                fp.write(str(preservation_mode)+ ",")
-                fp.write(str(not preservation_mode)+ ",")
             fp.write(str(fold) + ",")
             fp.write(k + ",")
             fp.write(str(lambda_1) + ",")
