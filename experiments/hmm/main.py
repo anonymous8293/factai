@@ -26,6 +26,7 @@ from tint.attr.models import (
     RetainNet,
 )
 from tint.datasets import HMM
+from tint.datasets.hmm_modified import HMM_modified
 from tint.metrics.white_box import (
     aup,
     aur,
@@ -52,9 +53,10 @@ def main(
     lambda_2: float = 1.0,
     output_file: str = "hmm_results_per_fold.csv",
     preservation_mode: bool=True,
-    preservation_test:bool=False
+    preservation_test:bool=False,
+    dataset_name: str = 'hmm',
+    hidden_size: int = 200
 ):
-    dataset_name = 'hmm'
 
     # If deterministic, seed everything
     if deterministic:
@@ -70,13 +72,13 @@ def main(
     lock = mp.Lock()
 
     # Load data
-    hmm = HMM(n_folds=5, fold=fold, seed=seed)
+    hmm = HMM(n_folds=5, fold=fold, seed=seed) if dataset_name == 'hmm' else HMM_modified (n_folds=5, fold=fold, seed=seed) 
 
     # Create classifier
     classifier = StateClassifierNet(
         feature_size=3,
         n_state=2,
-        hidden_size=200,
+        hidden_size=hidden_size,
         regres=True,
         loss="cross_entropy",
         lr=0.0001,
@@ -540,6 +542,18 @@ def parse_args():
         action="store_false",
         help="By default uses extremal_mask preservation game. When specified, it runs for the deletion game.",
     )
+    parser.add_argument(
+        "--dataset_name",
+        type=str,
+        default="hmm",
+        help="Name of dataset",
+    )
+    parser.add_argument(
+        "--hidden_size",
+        type=int,
+        default=200,
+        help="Length of sequence",
+    )
     return parser.parse_args()
 
 
@@ -554,5 +568,7 @@ if __name__ == "__main__":
         lambda_1=args.lambda_1,
         lambda_2=args.lambda_2,
         output_file=args.output_file,
-        preservation_mode=args.deletion_mode
+        preservation_mode=args.deletion_mode,
+        dataset_name=args.dataset_name,
+        hidden_size=args.hidden_size
     )
