@@ -1,22 +1,18 @@
 import copy
-import torch as th
-
-from captum.attr._utils.attribution import PerturbationAttribution
-from captum.log import log_usage
-from captum._utils.common import (
-    _format_inputs,
-    _format_output,
-    _is_tuple,
-)
-from captum._utils.typing import TensorOrTupleOfTensorsGeneric
-
-from pytorch_lightning import Trainer
-from torch.utils.data import DataLoader
 from typing import Any, Callable, Tuple
 
-from tint.utils import TensorDataset, _add_temporal_mask, default_collate
-from .models import MaskNet
+import torch as th
+from captum._utils.common import _format_inputs, _format_output, _is_tuple
+from captum._utils.typing import TensorOrTupleOfTensorsGeneric
+from captum.attr._utils.attribution import PerturbationAttribution
+from captum.log import log_usage
 from experiments.utils.get_model import get_model
+from pytorch_lightning import Trainer
+from tint.utils import TensorDataset, _add_temporal_mask, default_collate
+from torch.utils.data import DataLoader
+
+from .models import MaskNet
+
 
 class DynaMask(PerturbationAttribution):
     """
@@ -56,7 +52,7 @@ class DynaMask(PerturbationAttribution):
 
     def __init__(self, dataset_name, forward_func: Callable, seed, fold) -> None:
         super().__init__(forward_func=forward_func)
-        
+
         self.seed = seed
         self.fold = fold
         self.dataset_name = dataset_name
@@ -143,9 +139,7 @@ class DynaMask(PerturbationAttribution):
             trainer = copy.deepcopy(trainer)
 
         # Assert only one input, as the Retain only accepts one
-        assert (
-            len(inputs) == 1
-        ), "Multiple inputs are not accepted for this method"
+        assert len(inputs) == 1, "Multiple inputs are not accepted for this method"
         data = inputs[0]
 
         # If return temporal attr, we expand the input data
@@ -173,17 +167,27 @@ class DynaMask(PerturbationAttribution):
         # Prepare data
         dataloader = DataLoader(
             TensorDataset(
-                *(data, data, *additional_forward_args)
-                if additional_forward_args is not None
-                else (data, data, None)
+                *(
+                    (data, data, *additional_forward_args)
+                    if additional_forward_args is not None
+                    else (data, data, None)
+                )
             ),
             batch_size=batch_size,
             collate_fn=default_collate,
         )
 
         # Fit model
-        mask_net = get_model(trainer, mask_net, 'dyna_mask', self.dataset_name, self.seed, self.fold, train_dataloaders=dataloader)
-        
+        mask_net = get_model(
+            trainer,
+            mask_net,
+            "dyna_mask",
+            self.dataset_name,
+            self.seed,
+            self.fold,
+            train_dataloaders=dataloader,
+        )
+
         # trainer.fit(mask_net, train_dataloaders=dataloader)
 
         # Set model to eval mode
@@ -198,9 +202,7 @@ class DynaMask(PerturbationAttribution):
 
         # Reshape representation if temporal attributions
         if return_temporal_attributions:
-            attributions = attributions.reshape(
-                (-1, data.shape[1]) + data.shape[1:]
-            )
+            attributions = attributions.reshape((-1, data.shape[1]) + data.shape[1:])
 
         # Reshape as a tuple
         attributions = (attributions,)
@@ -208,25 +210,19 @@ class DynaMask(PerturbationAttribution):
         # Format attributions and return
         if return_best_ratio:
             return _format_output(is_inputs_tuple, attributions), best_ratio
-        return _format_output(is_inputs_tuple, attributions)
+        return _format_output(is_inputs_tuple, attributions), mask_net
 
     @staticmethod
-    def representation(
-        mask_net: MaskNet, trainer: Trainer, dataloader: DataLoader
-    ):
+    def representation(mask_net: MaskNet, trainer: Trainer, dataloader: DataLoader):
         mask = (
-            1.0 - mask_net.net.mask
-            if mask_net.net.deletion_mode
-            else mask_net.net.mask
+            1.0 - mask_net.net.mask if mask_net.net.deletion_mode else mask_net.net.mask
         )
 
         # Get the loss without reduction
         pred = trainer.predict(mask_net, dataloaders=dataloader)
         _loss = mask_net._loss
         _loss.reduction = "none"
-        loss = _loss(
-            th.cat([x[0] for x in pred]), th.cat([x[1] for x in pred])
-        )
+        loss = _loss(th.cat([x[0] for x in pred]), th.cat([x[1] for x in pred]))
 
         # Average the loss over each keep_ratio subset
         if len(loss.shape) > 1:
