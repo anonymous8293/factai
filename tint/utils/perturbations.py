@@ -1,9 +1,15 @@
 import torch as th
+import torch.nn as nn
+from tint.attr.models import ExtremalMaskNet, MaskNet
+from tint.models import Net
 from torch.nn.functional import normalize
 
 
 def compute_perturbations(
-    data, mask_net, perturb_net=None, batch_idx: int or None = 0
+    data: th.Tensor,
+    mask_net: Net,
+    perturb_net: nn.Module = None,
+    batch_idx: int or None = 0,
 ) -> (th.Tensor, th.Tensor, th.Tensor, th.Tensor, th.Tensor):
     """Use the trained mask network to compute perturbations and their intermediate results.
 
@@ -20,15 +26,31 @@ def compute_perturbations(
     - tensor of inputs with important features masked, i.e. from the paper: data * mask + (1 - mask) * NN(data)
     - tensor of inputs with unimportant features masked, i.e.: data * (1 - mask) + NN(data) * data
     """
-    if batch_idx == None:
-        FROM_B = 0
-        TO_B = len(data)
+    if isinstance(mask_net, MaskNet):
+        return _compute_perturbations_dynamask(data, mask_net, batch_idx)
+    elif isinstance(mask_net, ExtremalMaskNet):
+        return _compute_perturbations_extremal(data, mask_net, perturb_net, batch_idx)
+    else:
+        raise NotImplementedError(
+            "Perturbations can only be computed for ExtremalMask and DynaMask methods but mask_net is neither"
+        )
+
+
+def _compute_perturbations_extremal(
+    data: th.Tensor,
+    mask_net: ExtremalMaskNet,
+    perturb_net: nn.Module = None,
+    batch_idx: int or None = 0,
+) -> (th.Tensor, th.Tensor, th.Tensor, th.Tensor, th.Tensor):
+    if batch_idx is None:
+        from_b = 0
+        to_b = len(data)
     else:
         batch_size = mask_net.net.batch_size
-        FROM_B = batch_size * batch_idx
-        TO_B = batch_size * (batch_idx + 1)
+        from_b = batch_size * batch_idx
+        to_b = batch_size * (batch_idx + 1)
 
-    batch = data[FROM_B:TO_B]
+    batch = data[from_b:to_b]
 
     # If there is a model, NN(x), that predicts perturbations, use it
     # Otherwise, default to zeroes
@@ -36,7 +58,7 @@ def compute_perturbations(
 
     # Retrieve the learned mask for the batch in question
     mask = mask_net.net.mask
-    mask = mask[FROM_B:TO_B]
+    mask = mask[from_b:to_b]
     mask = mask.clamp(0, 1)
 
     # Mask data according to samples
@@ -50,7 +72,43 @@ def compute_perturbations(
     return batch, baseline.detach(), mask.detach(), x1.detach(), x2.detach()
 
 
-def compute_alternative(batch, mask, perturbation):
+def _compute_perturbations_dynamask(
+    data: th.Tensor, mask_net: MaskNet, batch_idx: int
+) -> (th.Tensor, th.Tensor, th.Tensor, th.Tensor, th.Tensor):
+    if mask_net.net.perturbation == "fade_moving_average":
+        return _fade_moving_average(x=data, mask_net=mask_net, batch_idx=batch_idx)
+    else:
+        raise NotImplementedError(
+            "Only fade_moving_average is implemented for fixed-function perturbation"
+        )
+
+
+def _fade_moving_average(
+    x: th.Tensor, mask_net: MaskNet, batch_idx: int
+) -> (th.Tensor, th.Tensor, th.Tensor, th.Tensor, th.Tensor):
+    """Computes perturbation components using fade moving average.
+
+    Adapted from MaskNet class.
+    """
+    net = mask_net.net
+    mask = 1.0 - net.mask if net.deletion_mode else net.mask
+
+    # Do not use net.keep_ratio here because we only use the first
+    # ratio
+    from_b = net.batch_size * batch_idx
+    to_b = net.batch_size * (batch_idx + 1)
+    mask = mask[from_b:to_b]
+    x = x[from_b:to_b]
+
+    moving_average = th.mean(x, 1).unsqueeze(1)
+    x1 = mask * x + (1 - mask) * moving_average
+    x2 = x * (1 - mask) + moving_average * mask
+    return x.detach(), moving_average.detach(), mask.detach(), x1.detach(), x2.detach()
+
+
+def compute_alternative(
+    batch: th.Tensor, mask: th.Tensor, perturbation: th.Tensor
+) -> th.Tensor:
     """Compute alternative saliency metric.
 
     1 - (1 - m) * |NN(x) - x|

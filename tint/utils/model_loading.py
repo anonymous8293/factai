@@ -1,8 +1,7 @@
 import os
-import torch as th
-
 import pickle
 
+import torch as th
 from experiments.hmm.classifier import StateClassifier, StateClassifierNet
 from experiments.mimic3.mortality.classifier import MimicClassifierNet
 
@@ -94,8 +93,8 @@ def get_model(
     lambda_2=None,
     retrain=False,
     preservation_mode=True,
+    checkpoint_dir: str = "experiments/checkpoints",
 ):
-    checkpoint_dir = "experiments/checkpoints"
 
     if model_name != "extremal_mask":
         checkpoint_path = (
@@ -111,6 +110,7 @@ def get_model(
         else:
             checkpoint_path = f"{checkpoint_dir}/{data_name}_{model_name}_{seed}_{lambda_1}_{lambda_2}_{fold}_deletion.ckpt"
 
+    print(f"Trying to load {checkpoint_path}")
     if not os.path.exists(checkpoint_dir):
         os.makedirs(checkpoint_dir)
 
