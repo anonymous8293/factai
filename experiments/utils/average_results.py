@@ -2,6 +2,19 @@ import os
 import pandas as pd
 from argparse import ArgumentParser
 
+def format_with_condition(value, std, precision=2):
+    if -1 < value < 1:
+        return f"{value:.{precision+1}f}±{std:.{precision+1}f}"
+    elif -10 < value < 10:
+        return f"{value:.{precision}f}±{std:.{precision}f}"
+    elif -100 < value < 100:
+        return f"{value:.{precision-1}f}±{std:.{precision-1}f}"
+    elif -1000 < value < 1000:
+        return f"{value:.{precision-2}f}±{std:.{precision-2}f}"
+    else:
+        return f"{value:.{precision}e}±{std:.{precision}e}"
+
+
 def average_main_experiment(results_file='results_per_fold.csv'):
     results_file_wo_extension = os.path.splitext(results_file)[0]
 
