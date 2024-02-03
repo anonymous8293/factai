@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
-from scipy.stats import t
+import seaborn as sns
 import torch as th
+from scipy.stats import t
 
 
 # Adapted from https://github.com/fzi-forschungszentrum-informatik/TSInterpret/blob/main/TSInterpret/InterpretabilityModels/Saliency/Saliency_Base.py
@@ -172,18 +172,6 @@ def plot_mean_attributions(
         # and add these confidence intervals to the mean
         conf_interval = (mean - conf_interval[0], conf_interval[1] - mean)
         feature_err.append(conf_interval)
-        if debug:
-            # Sanity check:
-            std = np.std(feature)
-            # assuming normal distr
-            # is this the same as the above?
-            serr = 1.96 * std
-            print(conf_interval)
-            print(type(conf_interval))
-            print(mean)
-            print(mean - conf_interval[0], mean + conf_interval[1])
-            print(mean - serr, mean + serr)
-            print()
 
     feature_means = np.array(feature_means)
     feature_err = np.array(feature_err)
