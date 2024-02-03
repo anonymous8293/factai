@@ -10,6 +10,7 @@ def format_with_condition(value, std, precision=2):
     elif -100 < value < 100:
         return f"{value:.{precision-1}f}±{std:.{precision-1}f}"
     elif -1000 < value < 1000:
+        print(value)
         return f"{value:.{precision-2}f}±{std:.{precision-2}f}"
     else:
         return f"{value:.{precision}e}±{std:.{precision}e}"
@@ -24,23 +25,23 @@ def average_main_experiment(results_file='results_per_fold.csv'):
     # Remove the last two columns
     df = df.iloc[:, :-2]
 
-    # Group by 'Seed', 'Explainer', 'Lambda_1', and 'Lambda_2'
-    grouped_df = df.groupby(['Seed', 'Explainer', 'Lambda_1', 'Lambda_2']).agg({
-        'AUP': ['mean', 'std'],
-        'AUR': ['mean', 'std'],
-        'Information': ['mean', 'std'],
-        'Entropy': ['mean', 'std']
-    }).reset_index()
+    grouping_columns = ['Seed', 'Explainer', 'Lambda_1', 'Lambda_2']
+    non_grouping_columns = [col for col in df.columns if col not in grouping_columns and col != 'Fold']
+
+    agg_dict = {col: ['mean', 'std'] for col in non_grouping_columns}
+
+    # Grouping and aggregating for non-grouping columns
+    grouped_df = df.groupby(grouping_columns).agg(agg_dict).reset_index()
     
     # Flatten the MultiIndex column headers
     grouped_df.columns = ['_'.join(col).strip() for col in grouped_df.columns.values]
 
-    # Create columns with average ± std format
+    # Create columns with average ± std format with the conditional formatting
     average_df = pd.DataFrame()
     average_df[['Seed', 'Explainer', 'Lambda_1', 'Lambda_2']] = grouped_df[['Seed_', 'Explainer_', 'Lambda_1_', 'Lambda_2_']]
 
     for metric in ['AUP', 'AUR', 'Information', 'Entropy']:
-        average_df[f'{metric}'] = grouped_df.apply(lambda row: f"{row[f'{metric}_mean']:.2f} ± {row[f'{metric}_std']:.4f}", axis=1)
+        average_df[f'{metric}'] = grouped_df.apply(lambda row: format_with_condition(row[f'{metric}_mean'], row[f'{metric}_std']), axis=1)
 
     # Save the result to a new CSV file with column headers
     average_df.to_csv(f'{results_file_wo_extension}_averaged.csv', index=False)
@@ -51,7 +52,7 @@ def parse_args():
         "--experiment",
         type=str,
         default='main',
-        help="Experiment to obtain average result for.",
+        help="Experiment to obtain the average result for.",
     )
     parser.add_argument(
         "--results-file",
@@ -66,4 +67,3 @@ if __name__ == "__main__":
     args = parse_args()
     if args.experiment == 'main':
         average_main_experiment(args.results_file)
-    

@@ -15,7 +15,6 @@ def format_with_condition(value, precision=2):
         return f"{value:.{precision}e}"
 
 def get_difference(x, y):
-    print("x is ",x)
     mean_std_x = x.split('±')
     mean_x = mean_std_x[0]
     std_x = mean_std_x[1]
@@ -32,10 +31,10 @@ def get_ratio(x, y):
 
 def compare_results(dataset_name, original_results_filename, repro_results_filename, ratio_mode: bool = False):
     repro_filename_without_extension = repro_results_filename.split('.')[0]
+    # original_results_dir_path = f'experiments/{dataset_name}'
+    # output_dir_path = f'{original_results_dir_path}/reproducibility_results'
     output_dir_path='.'
     original_results_dir_path='.'
-
-    repro_results_path = f'{repro_results_filename}'
     repro_results_path = f'{output_dir_path}/{repro_results_filename}'
     original_results_path = f'{original_results_dir_path}/{original_results_filename}'
 
@@ -83,8 +82,6 @@ def parse_args():
         action="store_true",
         help="Output ratio of difference to std.",
     )
-
-    
     return parser.parse_args()
 
 

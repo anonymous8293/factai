@@ -1,4 +1,7 @@
 # Pycharm
+
+pt
+ckpt
 .idea
 **/__pycache__
 
@@ -26,4 +29,13 @@ out
 .ckpt
 
 env/
-lightning_logs/
+
+arma
+covtype
+biobank
+hmm
+mimic3
+mnist
+voc
+i.pynb_checkpoints
+.swp

@@ -3,21 +3,12 @@ import numpy as np
 import random
 import torch as th
 import torch.nn as nn
-import os
-import pickle
-import sys
 
 from argparse import ArgumentParser
 from captum.attr import DeepLift, GradientShap, IntegratedGradients, Lime
 from pytorch_lightning import Trainer, seed_everything
-
-# from pytorch_lightning.loggers import TensorBoardLogger
 from typing import List
 from pytorch_lightning.loggers import TensorBoardLogger
-
-from experiments.utils.get_model import get_model
-from experiments.hmm.classifier import StateClassifierNet
-
 
 from tint.attr import (
     DynaMask,
@@ -35,6 +26,7 @@ from tint.attr.models import (
     RetainNet,
 )
 from tint.datasets import HMM
+from tint.datasets.hmm_modified import HMM_modified
 from tint.metrics.white_box import (
     aup,
     aur,
@@ -44,23 +36,12 @@ from tint.metrics.white_box import (
     auprc,
 )
 from tint.models import MLP, RNN
-import logging
 
-logging.basicConfig(
-    level=logging.WARNING,
-    filename="hmm.log",
-    format="%(asctime)s - %(name)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+from experiments.utils.get_model import get_model
+from experiments.utils.model_utils import get_perturbed_data
+from experiments.hmm.classifier import StateClassifierNet
+import pickle
 
-
-def save_explainer(explainer, mlp=None, explainer_name="explainer"):
-    if mlp is not None:
-        with open(f"mlp_{explainer_name}.pkl", "wb") as f:
-            pickle.dump(mlp, f)
-
-    with open(f"{explainer_name}.pkl", "wb") as f:
-        pickle.dump(explainer, f)
 
 
 def main(
@@ -71,10 +52,11 @@ def main(
     deterministic: bool = False,
     lambda_1: float = 1.0,
     lambda_2: float = 1.0,
-    retrain: bool = False,
-    output_file: str = "results_per_fold.csv",
+    output_file: str = "hmm_results_per_fold.csv",
+    preservation_mode: bool=True,
+    dataset_name: str = 'hmm',
+    hidden_size: int = 200
 ):
-    dataset_name = "hmm"
 
     # If deterministic, seed everything
     if deterministic:
@@ -90,14 +72,13 @@ def main(
     lock = mp.Lock()
 
     # Load data
-    hmm = HMM(n_folds=5, fold=fold, seed=seed)
-    print(hmm.true_saliency(split="test"))
+    hmm = HMM(n_folds=5, fold=fold, seed=seed) if dataset_name == 'hmm' else HMM_modified (n_folds=5, fold=fold, seed=seed) 
 
     # Create classifier
     classifier = StateClassifierNet(
         feature_size=3,
         n_state=2,
-        hidden_size=200,
+        hidden_size=hidden_size,
         regres=True,
         loss="cross_entropy",
         lr=0.0001,
@@ -110,24 +91,11 @@ def main(
         accelerator=accelerator,
         devices=device_id,
         deterministic=deterministic,
-        logger=TensorBoardLogger(
-            save_dir=".",
-            version=random.getrandbits(128),
-        ),
+        logger=False
     )
-
-    classifier = get_model(
-        trainer,
-        classifier,
-        "classifier",
-        dataset_name,
-        seed,
-        fold,
-        lambda_1=lambda_1,
-        lambda_2=lambda_2,
-        datamodule=hmm,
-    )
-
+    
+    classifier = get_model(trainer, classifier, 'classifier', dataset_name, seed, fold, lambda_1=lambda_1, lambda_2=lambda_2, datamodule=hmm)
+    
     # trainer.fit(classifier, datamodule=hmm)
 
     # Get data for explainers
@@ -160,6 +128,7 @@ def main(
             task="binary",
             show_progress=True,
         ).abs()
+        
 
         with open(output_file, "a") as fp, lock:
             k = "deep_lift"
@@ -176,18 +145,14 @@ def main(
             fp.write(f"{roc_auc(v, true_saliency):.4},")
             fp.write(f"{auprc(v, true_saliency):.4}")
             fp.write("\n")
-
+        
     if "dyna_mask" in explainers:
         trainer = Trainer(
             max_epochs=1000,
             accelerator=accelerator,
             devices=device_id,
-            log_every_n_steps=2,
             deterministic=deterministic,
-            logger=TensorBoardLogger(
-                save_dir=".",
-                version=random.getrandbits(128),
-            ),
+            logger=False
         )
         mask = MaskNet(
             forward_func=classifier,
@@ -228,18 +193,15 @@ def main(
 
     if "extremal_mask" in explainers:
         trainer = Trainer(
-            max_epochs=20,
+            max_epochs=500,
             accelerator=accelerator,
             devices=device_id,
-            log_every_n_steps=2,
             deterministic=deterministic,
-            logger=TensorBoardLogger(
-                save_dir=".",
-                version=random.getrandbits(128),
-            ),
+            logger=False
         )
         mask = ExtremalMaskNet(
             forward_func=classifier,
+            preservation_mode=preservation_mode,
             model=nn.Sequential(
                 RNN(
                     input_size=x_test.shape[-1],
@@ -254,7 +216,6 @@ def main(
             optim="adam",
             lr=0.01,
         )
-        logging.warn(f"data, {x_test[0].T[0][:20]}")
         explainer = ExtremalMask(dataset_name, classifier, seed, fold)
         _attr = explainer.attribute(
             x_test,
@@ -262,19 +223,8 @@ def main(
             trainer=trainer,
             mask_net=mask,
             batch_size=100,
-            retrain=retrain,
         )
-        logging.warn(f"_attr, {_attr[0].T[0][:20]}")
-        logging.warn(f"mask.net.mask, {mask.net.mask[0].T[0][:20]}")
-        logging.warn(f"true_saliency, {true_saliency[0].T[0][:20]}")
-
         attr["extremal_mask"] = _attr.to(device)
-        save_explainer(_attr, explainer_name=f"{seed}_hmm_extremal2_attr")
-        save_explainer(mask, explainer_name=f"{seed}_hmm_extremal2_mask_net")
-        save_explainer(
-            mask.net.model, explainer_name=f"{seed}_hmm_extremal2_perturbation_net"
-        )
-        save_explainer(explainer, explainer_name=f"{seed}_hmm_extremal2_explainer")
 
         with open(output_file, "a") as fp, lock:
             k = "extremal_mask"
@@ -298,12 +248,8 @@ def main(
             max_epochs=300,
             accelerator=accelerator,
             devices=device_id,
-            log_every_n_steps=10,
             deterministic=deterministic,
-            logger=TensorBoardLogger(
-                save_dir=".",
-                version=random.getrandbits(128),
-            ),
+            logger=False
         )
         explainer = Fit(
             dataset_name,
@@ -312,7 +258,7 @@ def main(
             datamodule=hmm,
             trainer=trainer,
             seed=seed,
-            fold=fold,
+            fold=fold
         )
         attr["fit"] = explainer.attribute(x_test, show_progress=True)
 
@@ -334,18 +280,14 @@ def main(
 
     if "gradient_shap" in explainers:
         explainer = TimeForwardTunnel(GradientShap(classifier.cpu()))
-        attr["gradient_shap"] = (
-            explainer.attribute(
-                x_test.cpu(),
-                baselines=th.cat([x_test.cpu() * 0, x_test.cpu()]),
-                n_samples=50,
-                stdevs=0.0001,
-                task="binary",
-                show_progress=True,
-            )
-            .abs()
-            .to(device)
-        )
+        attr["gradient_shap"] = explainer.attribute(
+            x_test.cpu(),
+            baselines=th.cat([x_test.cpu() * 0, x_test.cpu()]),
+            n_samples=50,
+            stdevs=0.0001,
+            task="binary",
+            show_progress=True,
+        ).abs().to(device)
         classifier.to(device)
 
         with open(output_file, "a") as fp, lock:
@@ -389,7 +331,7 @@ def main(
             fp.write(f"{roc_auc(v, true_saliency):.4},")
             fp.write(f"{auprc(v, true_saliency):.4}")
             fp.write("\n")
-
+        
     if "lime" in explainers:
         explainer = TimeForwardTunnel(Lime(classifier))
         attr["lime"] = explainer.attribute(
@@ -413,7 +355,7 @@ def main(
             fp.write(f"{roc_auc(v, true_saliency):.4},")
             fp.write(f"{auprc(v, true_saliency):.4}")
             fp.write("\n")
-
+    
     if "augmented_occlusion" in explainers:
         explainer = TimeForwardTunnel(
             TemporalAugmentedOcclusion(
@@ -443,7 +385,7 @@ def main(
             fp.write(f"{roc_auc(v, true_saliency):.4},")
             fp.write(f"{auprc(v, true_saliency):.4}")
             fp.write("\n")
-
+        
     if "occlusion" in explainers:
         explainer = TimeForwardTunnel(TemporalOcclusion(classifier))
         attr["occlusion"] = explainer.attribute(
@@ -470,7 +412,7 @@ def main(
             fp.write(f"{roc_auc(v, true_saliency):.4},")
             fp.write(f"{auprc(v, true_saliency):.4}")
             fp.write("\n")
-
+        
     if "retain" in explainers:
         retain = RetainNet(
             dim_emb=128,
@@ -490,15 +432,14 @@ def main(
                 accelerator=accelerator,
                 devices=device_id,
                 deterministic=deterministic,
-                logger=TensorBoardLogger(
-                    save_dir=".",
-                    version=random.getrandbits(128),
-                ),
+                logger=False
             ),
             seed=seed,
-            fold=fold,
+            fold=fold
         )
-        attr["retain"] = explainer.attribute(x_test, target=y_test).abs().to(device)
+        attr["retain"] = (
+            explainer.attribute(x_test, target=y_test).abs().to(device)
+        )
 
         with open(output_file, "a") as fp, lock:
             k = "retain"
@@ -515,7 +456,7 @@ def main(
             fp.write(f"{roc_auc(v, true_saliency):.4},")
             fp.write(f"{auprc(v, true_saliency):.4}")
             fp.write("\n")
-
+        
     # with open(output_file, "a") as fp, lock:
     #     for k, v in attr.items():
     #         fp.write(str(seed) + ",")
@@ -538,16 +479,16 @@ def parse_args():
         "--explainers",
         type=str,
         default=[
-            # "deep_lift",
-            # "dyna_mask",
+            #"deep_lift",
+            "dyna_mask",
             "extremal_mask",
-            # "fit",
-            # "gradient_shap",
-            # "integrated_gradients",
-            # "lime",
-            # "augmented_occlusion",
-            # "occlusion",
-            # "retain",
+            "fit",
+            "gradient_shap",
+            "integrated_gradients",
+            "lime",
+            "augmented_occlusion",
+            "occlusion",
+            "retain",
         ],
         nargs="+",
         metavar="N",
@@ -591,13 +532,25 @@ def parse_args():
     parser.add_argument(
         "--output-file",
         type=str,
-        default="results_per_fold.csv",
+        default="hmm_results_per_fold.csv",
         help="Where to save the results.",
     )
     parser.add_argument(
-        "--retrain",
-        action="store_true",
-        help="Whether to retrain the explainer",
+        "--deletion-mode",
+        action="store_false",
+        help="By default uses extremal_mask preservation game. When specified, it runs for the deletion game.",
+    )
+    parser.add_argument(
+        "--dataset_name",
+        type=str,
+        default="hmm",
+        help="Name of dataset",
+    )
+    parser.add_argument(
+        "--hidden_size",
+        type=int,
+        default=200,
+        help="Length of sequence",
     )
     return parser.parse_args()
 
@@ -613,5 +566,7 @@ if __name__ == "__main__":
         lambda_1=args.lambda_1,
         lambda_2=args.lambda_2,
         output_file=args.output_file,
-        retrain=args.retrain,
+        preservation_mode=args.deletion_mode,
+        dataset_name=args.dataset_name,
+        hidden_size=args.hidden_size
     )
