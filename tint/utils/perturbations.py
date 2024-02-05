@@ -107,7 +107,11 @@ def _fade_moving_average(
 
 
 def compute_alternative(
-    batch: th.Tensor, mask: th.Tensor, perturbation: th.Tensor
+    batch: th.Tensor,
+    mask: th.Tensor,
+    perturbation: th.Tensor,
+    normalize_along_dim: int or tuple = (1, 2),
+    p: int = 2,
 ) -> th.Tensor:
     """Compute alternative saliency metric.
 
@@ -115,6 +119,6 @@ def compute_alternative(
     Intuition: the higher this value, the more perturbed the data is.
     """
     normalized_alt = th.abs(perturbation - batch)
-    normalized_alt = normalize(normalized_alt, dim=1)
+    normalized_alt = normalize(normalized_alt, dim=normalize_along_dim, p=p)
     alternative = 1 - (1 - mask) * normalized_alt
     return alternative
