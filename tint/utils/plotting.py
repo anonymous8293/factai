@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import torch as th
+from matplotlib.lines import Line2D
 from scipy.stats import t
 
 
@@ -71,7 +72,13 @@ def plot_saliency(
 
 
 # Adapted from appendix of https://arxiv.org/abs/2106.05303
-def plot_heatmap(saliencies, figsize=None, title: str = "Mask coefficients over time"):
+def plot_heatmap(
+    saliencies,
+    figsize=None,
+    title: str = "Mask coefficients over time",
+    subtitles: list or None = None,
+    cbar_title: str = "Saliency / Mask intensity",
+):
     plt.style.use("default")
     N = len(saliencies)
     if figsize is None:
@@ -89,7 +96,7 @@ def plot_heatmap(saliencies, figsize=None, title: str = "Mask coefficients over 
             cmap=color_map,
             cbar=idx == 0,
             cbar_ax=None if idx else cbar_ax,
-            cbar_kws={"label": "Saliency / Mask intensity"},
+            cbar_kws={"label": cbar_title},
             ax=axn[idx],
             yticklabels=True,
             linecolor="#d8cbd5",
@@ -98,12 +105,80 @@ def plot_heatmap(saliencies, figsize=None, title: str = "Mask coefficients over 
             vmax=1,
         )
         axn[idx].tick_params(axis="both", which="major", labelsize=7)
-        axn[idx].set_title(f"Method: {method}")
+        if subtitles is not None:
+            axn[idx].set_title(subtitles[idx])
+        else:
+            axn[idx].set_title(f"Method: {method}")
         axn[idx].set_xlabel("Time")
         axn[idx].set_ylabel("Feature number")
 
     fig.suptitle(title)
     fig.tight_layout(rect=[0, 0, 0.9, 1])
+    plt.show()
+
+
+def plot_topk_heatmap(
+    saliencies,
+    subtitles: list or None = None,
+    figsize=None,
+):
+    plt.style.use("default")
+    N = len(saliencies)
+    if figsize is None:
+        figsize = (10, N * 2)
+
+    fig, axn = plt.subplots(int(np.ceil(N / 2)), 2, figsize=figsize)
+    axn = axn.flatten()
+    color_map = sns.diverging_palette(10, 133, as_cmap=True)
+
+    legend_elements = [
+        Line2D(
+            [0],
+            [0],
+            color="w",
+            marker="s",
+            markerfacecolor="#398649",
+            label="Salient",
+            markersize=15,
+        ),
+        Line2D(
+            [0],
+            [0],
+            color="w",
+            marker="s",
+            markerfacecolor="#DA3B46",
+            label="Non-salient",
+            markersize=15,
+        ),
+    ]
+
+    for idx, (method, saliency) in enumerate(saliencies.items()):
+        sns.heatmap(
+            saliency,
+            cmap=color_map,
+            cbar=False,
+            ax=axn[idx],
+            yticklabels=True,
+            linecolor="#d8cbd5",
+            linewidths=0.4,
+            vmin=0,
+            vmax=1,
+        )
+        axn[idx].tick_params(axis="both", which="major", labelsize=7)
+        if subtitles:
+            axn[idx].set_title(method)
+        else:
+            axn[idx].set_title(f"Method: {method}")
+        axn[idx].set_xlabel("Time")
+        axn[idx].set_ylabel("Feature number")
+
+    fig.tight_layout(rect=[0, 0, 0.92, 1])
+    fig.legend(
+        handles=legend_elements,
+        loc="center left",
+        bbox_to_anchor=(0.9, 0.5),
+        bbox_transform=fig.transFigure,
+    )
     plt.show()
 
 
