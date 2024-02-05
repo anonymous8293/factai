@@ -4,15 +4,20 @@ import shutil
 from argparse import ArgumentParser
 
 
-def main(experiment: str):
+def main(experiment: str="main"):
     if experiment == "main":
-        with open("results.csv", "w") as fp:
+        with open("hmm_results_per_fold.csv", "w") as fp:
             fp.write(
                 "Seed,Fold,Explainer,Lambda_1,Lambda_2,AUP,AUR,Information,Entropy,AUROC,AUPRC\n"
             )
 
     elif experiment == "lambda_study":
         with open("lambda_study.csv", "w") as fp:
+            fp.write(
+                "Seed,Fold,Explainer,Lambda_1,Lambda_2,AUP,AUR,Information,Entropy,AUROC,AUPRC\n"
+            )
+    elif experiment == "deletion":
+        with open("hmm_results_per_fold_deletion.csv", "w") as fp:
             fp.write(
                 "Seed,Fold,Explainer,Lambda_1,Lambda_2,AUP,AUR,Information,Entropy,AUROC,AUPRC\n"
             )
