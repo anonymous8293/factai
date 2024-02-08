@@ -55,8 +55,13 @@ def main(
     output_file: str = "hmm_results_per_fold.csv",
     preservation_mode: bool=True,
     dataset_name: str = 'hmm',
-    hidden_size: int = 200
+    hidden_size: int = 200,
+    use_ce: bool = False,
 ):
+    if use_ce:
+        loss = 'cross_entropy'
+    else:
+        loss = 'mse'
 
     # If deterministic, seed everything
     if deterministic:
@@ -162,6 +167,7 @@ def main(
             size_reg_factor_init=0.1,
             size_reg_factor_dilation=100,
             time_reg_factor=1.0,
+            loss=loss
         )
         explainer = DynaMask(dataset_name, classifier, seed, fold)
         _attr = explainer.attribute(
@@ -215,6 +221,7 @@ def main(
             lambda_2=lambda_2,
             optim="adam",
             lr=0.01,
+            loss=loss
         )
         explainer = ExtremalMask(dataset_name, classifier, seed, fold)
         _attr = explainer.attribute(
@@ -541,16 +548,21 @@ def parse_args():
         help="By default uses extremal_mask preservation game. When specified, it runs for the deletion game.",
     )
     parser.add_argument(
-        "--dataset_name",
+        "--dataset-name",
         type=str,
         default="hmm",
         help="Name of dataset",
     )
     parser.add_argument(
-        "--hidden_size",
+        "--hidden-size",
         type=int,
         default=200,
         help="Length of sequence",
+    )
+    parser.add_argument(
+        "--use-ce",
+        action="store_true",
+        help="Whether to make training deterministic or not.",
     )
     return parser.parse_args()
 
@@ -568,5 +580,6 @@ if __name__ == "__main__":
         output_file=args.output_file,
         preservation_mode=args.deletion_mode,
         dataset_name=args.dataset_name,
-        hidden_size=args.hidden_size
+        hidden_size=args.hidden_size,
+        use_ce=args.use_ce
     )
