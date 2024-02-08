@@ -17,6 +17,7 @@ from typing import Any, Callable, Tuple
 from tint.utils import TensorDataset, _add_temporal_mask, default_collate
 from .models import MaskNet
 from experiments.utils.get_model import get_model
+import torch.nn as nn
 
 class DynaMask(PerturbationAttribution):
     """
@@ -186,8 +187,7 @@ class DynaMask(PerturbationAttribution):
             mask_net = mask_net.to(device)
 
 
-        print(mask_net._loss)
-        if mask_net._loss == 'mse':
+        if mask_net._loss == nn.MSELoss:
             use_ce = False
         else:
             use_ce = True

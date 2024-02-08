@@ -23,6 +23,7 @@ from typing import Any, Callable, Tuple
 from tint.utils import TensorDataset, _add_temporal_mask, default_collate
 from .models import ExtremalMaskNet
 from experiments.utils.get_model import get_model
+import torch.nn as nn
 
 class ExtremalMask(PerturbationAttribution):
     """
@@ -231,12 +232,10 @@ class ExtremalMask(PerturbationAttribution):
         )
 
         # Fit model
-        if mask_net._loss == 'mse':
+        if mask_net._loss == nn.MSELoss:
             use_ce = False
         else:
             use_ce = True
-        
-        print(mask_net._loss)
 
         mask_net = get_model(trainer, mask_net, 'extremal_mask', self.dataset_name, self.seed, self.fold, lambda_1 = mask_net.lambda_1, lambda_2 = mask_net.lambda_2, train_dataloaders=dataloader, preservation_mode=mask_net.preservation_mode, use_ce=use_ce)
 
