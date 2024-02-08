@@ -8,6 +8,7 @@ channels:
 dependencies:
   - python==3.9.7
   - cudatoolkit==11.6
+  - pytorch-cuda=11.6
   - captum
   - datasets
   - git
@@ -19,7 +20,6 @@ dependencies:
   - scikit-image
   - scikit-learn
   - scipy
-  - pytorch
   - pytorch-lightning
   - torchmetrics
   - torchvision

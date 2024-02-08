@@ -232,7 +232,7 @@ class ExtremalMask(PerturbationAttribution):
         )
 
         # Fit model
-        if mask_net._loss == nn.MSELoss:
+        if isinstance(mask_net._loss,nn.MSELoss):
             use_ce = False
         else:
             use_ce = True
