@@ -77,7 +77,9 @@ def main(
     lock = mp.Lock()
 
     # Load data
+    
     hmm = HMM(n_folds=5, fold=fold, seed=seed) if dataset_name == 'hmm' else HMM_modified (n_folds=5, fold=fold, seed=seed) 
+    hmm.prepare_data()
 
     # Create classifier
     classifier = StateClassifierNet(

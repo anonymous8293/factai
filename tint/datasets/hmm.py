@@ -74,8 +74,6 @@ class HMM(DataModule):
         num_workers: int = 0,
         seed: int = 42,
     ):
-        print(data_dir)
-
         super().__init__(
             data_dir=data_dir,
             batch_size=batch_size,
