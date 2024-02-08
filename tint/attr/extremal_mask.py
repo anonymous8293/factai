@@ -231,7 +231,14 @@ class ExtremalMask(PerturbationAttribution):
         )
 
         # Fit model
-        mask_net = get_model(trainer, mask_net, 'extremal_mask', self.dataset_name, self.seed, self.fold, lambda_1 = mask_net.lambda_1, lambda_2 = mask_net.lambda_2, train_dataloaders=dataloader, preservation_mode=mask_net.preservation_mode)
+        if mask_net._loss == 'mse':
+            use_ce = False
+        else:
+            use_ce = True
+        
+        print(mask_net._loss)
+
+        mask_net = get_model(trainer, mask_net, 'extremal_mask', self.dataset_name, self.seed, self.fold, lambda_1 = mask_net.lambda_1, lambda_2 = mask_net.lambda_2, train_dataloaders=dataloader, preservation_mode=mask_net.preservation_mode, use_ce=use_ce)
 
         # trainer.fit(mask_net, train_dataloaders=dataloader)
 

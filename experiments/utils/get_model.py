@@ -55,7 +55,7 @@ def save_explainer( explainer, model_name, data_name, seed, fold, lambda_1 = Non
             pickle.dump(explainer, f)
 
 
-def get_model(trainer, model, model_name, data_name, seed, fold, train_dataloaders = None, datamodule = None, lambda_1 = None, lambda_2 = None, retrain = False, preservation_mode = True, save_as_pth=False):
+def get_model(trainer, model, model_name, data_name, seed, fold, train_dataloaders = None, datamodule = None, lambda_1 = None, lambda_2 = None, retrain = False, preservation_mode = True, use_ce=False):
 
     checkpoint_dir = 'experiments/checkpoints'
 
@@ -68,6 +68,9 @@ def get_model(trainer, model, model_name, data_name, seed, fold, train_dataloade
             checkpoint_path_without_extension = f'{checkpoint_dir}/{data_name}_{model_name}_{seed}_{lambda_1}_{lambda_2}_{fold}'
         else:
             checkpoint_path_without_extension = f'{checkpoint_dir}/{data_name}_{model_name}_{seed}_{lambda_1}_{lambda_2}_{fold}_deletion'
+
+    if use_ce:
+        checkpoint_path_without_extension += f'_CE'
 
     checkpoint_path = checkpoint_path_without_extension + '.ckpt'
 

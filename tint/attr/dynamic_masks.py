@@ -186,8 +186,14 @@ class DynaMask(PerturbationAttribution):
             mask_net = mask_net.to(device)
 
 
+        print(mask_net._loss)
+        if mask_net._loss == 'mse':
+            use_ce = False
+        else:
+            use_ce = True
+
         # Fit model
-        mask_net = get_model(trainer, mask_net, 'dyna_mask', self.dataset_name, self.seed, self.fold, train_dataloaders=dataloader)
+        mask_net = get_model(trainer, mask_net, 'dyna_mask', self.dataset_name, self.seed, self.fold, train_dataloaders=dataloader, use_ce=use_ce)
         
         # trainer.fit(mask_net, train_dataloaders=dataloader)
 
