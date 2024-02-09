@@ -7,6 +7,7 @@ outputfile=${outputfile:-mimic_results_per_fold.csv}
 preservation=${preservation:-true}
 minfold=${minfold:-0}
 maxfold=${maxfold:-4}
+explainers=${explainers:-all}
 
 while [ $# -gt 0 ]
 do
@@ -28,9 +29,13 @@ function ctrl_c() {
 for fold in $(seq $minfold $maxfold)
 do
   if [[ $preservation = true ]]; then 
-    python -m experiments.mimic3.main --device "$device" --fold "$fold" --seed "$seed" --deterministic --output-file "$outputfile"&
+    if [[ $explainers = all ]]; then
+      python -m experiments.mimic3.mortality.main --device "$device" --fold "$fold" --seed "$seed" --deterministic --output-file "$outputfile" &
+    else
+      python -m experiments.mimic3.mortality.main --device "$device" --fold "$fold" --seed "$seed" --deterministic --output-file "$outputfile" --explainers "$explainers" &
+    fi
   else 
-    python -m experiments.mimic3.main --device "$device" --fold "$fold" --seed "$seed" --deletion-mode --explainers extremal_mask --output-file "$outputfile"&
+    python -m experiments.mimic3.mortality.main --device "$device" --fold "$fold" --seed "$seed" --deletion-mode --explainers extremal_mask --output-file "$outputfile"&
   fi
 
   # Support lower versions
