@@ -3,6 +3,10 @@
 processes=${processes:-5}
 device=${device:-cpu}
 seed=${seed:-42}
+outputfile=${outputfile:-mimic_results_per_fold.csv}
+preservation=${preservation:-true}
+minfold=${minfold:-0}
+maxfold=${maxfold:-4}
 
 while [ $# -gt 0 ]
 do
@@ -21,9 +25,13 @@ function ctrl_c() {
     kill -- -$$
 }
 
-for fold in $(seq 0 4)
+for fold in $(seq $minfold $maxfold)
 do
-  python main.py --device "$device" --fold "$fold" --seed "$seed" &
+  if [[ $preservation = true ]]; then 
+    python -m experiments.mimic3.main --device "$device" --fold "$fold" --seed "$seed" --deterministic --output-file "$outputfile"&
+  else 
+    python -m experiments.mimic3.main --device "$device" --fold "$fold" --seed "$seed" --deletion-mode --explainers extremal_mask --output-file "$outputfile"&
+  fi
 
   # Support lower versions
   if ((BASH_VERSINFO[0] >= 4)) && ((BASH_VERSINFO[1] >= 3))

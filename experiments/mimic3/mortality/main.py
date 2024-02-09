@@ -566,6 +566,11 @@ def parse_args():
         default="mimic_results_per_fold.csv",
         help="Where to save the results.",
     )
+    parser.add_argument(
+        "--deletion-mode",
+        action="store_false",
+        help="By default uses extremal_mask preservation game. When specified, it runs for the deletion game.",
+    )
     return parser.parse_args()
 
 
@@ -581,4 +586,5 @@ if __name__ == "__main__":
         lambda_1=args.lambda_1,
         lambda_2=args.lambda_2,
         output_file=args.output_file,
+        preservation_mode=args.deletion_mode
     )
