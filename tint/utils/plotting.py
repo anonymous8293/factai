@@ -222,46 +222,108 @@ def plot_components(
 
 
 def plot_mean_attributions(
-    attr, alpha=0.95, title=None, xtick_labels=None, debug=False
+    attr,
+    alpha=0.95,
+    decay: bool = False,
+    title=None,
+    xtick_labels=None,
+    debug=False,
 ):
+    def compute_means_errors(means_over_time):
+        # Compute means and confidence intervals
+        feature_means = []
+        feature_err = []
+        for feature in means_over_time.T:
+            mean = feature.mean()
+            feature_means.append(mean)
+            conf_interval = t.interval(
+                confidence=alpha,
+                df=len(feature) - 1,
+                loc=np.mean(feature),
+                scale=np.std(feature) / np.sqrt(len(feature)),
+            )
+            # This is needed for the plotting function only, it will always subtract
+            # and add these confidence intervals to the mean
+            conf_interval = (mean - conf_interval[0], conf_interval[1] - mean)
+            feature_err.append(conf_interval)
+        return np.array(feature_means), np.array(feature_err)
+
+    if decay:
+        time_horizon = attr.shape[1]  # Assuming time dimension is 1
+        # Compute decays
+        linear_decay_weights = [1 - t / time_horizon for t in range(time_horizon)]
+        # Reverse weights since the most important point is the last one
+        linear_decay_weights = linear_decay_weights[::-1]
+        exp_decay_weights = [np.e**-t for t in range(time_horizon)]
+        exp_decay_weights = exp_decay_weights[::-1]
+
     means_over_time = []
+    means_over_time_lin_dec = []
+    means_over_time_exp_dec = []
     # Compute means per time series (or feature)
     for patient in attr:
+        if decay:
+            means_over_time_lin_dec.append(
+                np.average(patient, axis=0, weights=linear_decay_weights)
+            )
+            means_over_time_exp_dec.append(
+                np.average(patient, axis=0, weights=exp_decay_weights)
+            )
         means_over_time.append(patient.mean(axis=0))
-
     means_over_time = np.array(means_over_time)
+    feature_means, feature_err = compute_means_errors(means_over_time)
 
-    # Compute means and confidence intervals
-    feature_means = []
-    feature_err = []
-    for feature in means_over_time.T:
-        mean = feature.mean()
-        feature_means.append(mean)
-        conf_interval = t.interval(
-            confidence=alpha,
-            df=len(feature) - 1,
-            loc=np.mean(feature),
-            scale=np.std(feature) / np.sqrt(len(feature)),
+    if decay:
+        means_over_time_lin_dec = np.array(means_over_time_lin_dec)
+        feature_means_lin_dec, feature_err_lin_dec = compute_means_errors(
+            means_over_time_lin_dec
         )
-        # This is needed for the plotting function only, it will always subtract
-        # and add these confidence intervals to the mean
-        conf_interval = (mean - conf_interval[0], conf_interval[1] - mean)
-        feature_err.append(conf_interval)
 
-    feature_means = np.array(feature_means)
-    feature_err = np.array(feature_err)
+        means_over_time_exp_dec = np.array(means_over_time_exp_dec)
+        feature_means_exp_dec, feature_err_exp_dec = compute_means_errors(
+            means_over_time_exp_dec
+        )
+
     if debug:
-        # feature_err = th.zeros_like(th.tensor(feature_err))
         # Top k feature importances
         k = 5
         ind = np.argpartition(feature_means, -k)[-k:].astype(int)
-        print(ind)
-        print(np.array(xtick_labels)[ind])
+        print("No decay")
+        print(ind, np.array(xtick_labels)[ind])
+        if decay:
+            ind = np.argpartition(feature_means_lin_dec, -k)[-k:].astype(int)
+            print("Linear decay")
+            print(ind, np.array(xtick_labels)[ind])
+            ind = np.argpartition(feature_means_exp_dec, -k)[-k:].astype(int)
+            print("Exponential decay")
+            print(ind, np.array(xtick_labels)[ind])
 
     xs = np.arange(len(feature_means))
     plt.errorbar(
-        xs, feature_means, yerr=feature_err.T, fmt="^", label="Mean attribution"
+        xs,
+        feature_means,
+        yerr=feature_err.T,
+        fmt="^",
+        label="No decay" if decay else "Mean attribution",
     )
+    if decay:
+        plt.errorbar(
+            xs,
+            feature_means_lin_dec,
+            yerr=feature_err_lin_dec.T,
+            fmt="^",
+            label="Linear decay",
+        )
+        # Take out Temperature outlier
+        feature_means_exp_dec[26] = np.nan
+        feature_err_exp_dec[26] = np.nan
+        plt.errorbar(
+            xs,
+            feature_means_exp_dec,
+            yerr=feature_err_exp_dec.T,
+            fmt="^",
+            label="Exponential decay",
+        )
     plt.ylabel("Attribution")
     plt.xticks(ticks=xs, labels=xtick_labels, rotation=50, fontsize=8, ha="right")
     plt.legend()
