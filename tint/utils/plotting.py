@@ -252,11 +252,15 @@ def plot_mean_attributions(
     if decay:
         time_horizon = attr.shape[1]  # Assuming time dimension is 1
         # Compute decays
-        linear_decay_weights = [1 - t / time_horizon for t in range(time_horizon)]
+        linear_decay_weights = [
+            1 - ((time_horizon - t) / time_horizon) for t in range(time_horizon)
+        ]
         # Reverse weights since the most important point is the last one
-        linear_decay_weights = linear_decay_weights[::-1]
-        exp_decay_weights = [np.e ** (-t / time_horizon) for t in range(time_horizon)]
-        exp_decay_weights = exp_decay_weights[::-1]
+        # linear_decay_weights = linear_decay_weights[::-1]
+        exp_decay_weights = [
+            np.e ** (-(time_horizon - t) / time_horizon) for t in range(time_horizon)
+        ]
+        # exp_decay_weights = exp_decay_weights[::-1]
 
     means_over_time = []
     means_over_time_lin_dec = []
