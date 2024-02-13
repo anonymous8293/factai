@@ -149,7 +149,10 @@ class HMM(DataModule):
         label_logits = list()
         mean, cov = self.init_dist()
 
-        for i in range(count):
+        means = np.array((count, signal_length, len(self.scale[0])), dtype=float)
+        salient_features = np.array((count, signal_length), dtype=int)
+
+        for n in range(count):
             signal = list()
             states = list()
             y = list()
@@ -159,6 +162,7 @@ class HMM(DataModule):
             previous = np.random.binomial(1, self.p0)[0]
             delta_state = 0
             state_n = None
+            
             for i in range(signal_length):
                 next = self.next_state(previous, delta_state)
                 state_n = next
@@ -178,6 +182,8 @@ class HMM(DataModule):
                     mean[state_n],
                     cov[state_n],
                 )
+                means[n, i, :] = mean[state_n]
+                salient_features[n, i] = self.imp_feature[state_n]
                 previous = state_n
                 signal.append(sample)
                 y_logit = logit(sample[self.imp_feature[state_n]])
@@ -217,6 +223,13 @@ class HMM(DataModule):
             os.path.join(self.data_dir, file + "labels_logits.npz"), "wb"
         ) as fp:
             pkl.dump(obj=label_logits, file=fp)
+
+        if split == "train":
+            self.train_means = means
+            self.train_salient_features = salient_features
+        elif split == "test":
+            self.test_means = means
+            self.test_salient_features = salient_features
 
     def preprocess(self, split: str = "train") -> dict:
         file = os.path.join(self.data_dir, f"{split}_")
