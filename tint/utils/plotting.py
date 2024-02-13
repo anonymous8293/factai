@@ -248,13 +248,14 @@ def plot_mean_attributions(
             feature_err.append(conf_interval)
         return np.array(feature_means), np.array(feature_err)
 
+    plt.style.use("default")
     if decay:
         time_horizon = attr.shape[1]  # Assuming time dimension is 1
         # Compute decays
         linear_decay_weights = [1 - t / time_horizon for t in range(time_horizon)]
         # Reverse weights since the most important point is the last one
         linear_decay_weights = linear_decay_weights[::-1]
-        exp_decay_weights = [np.e**-t for t in range(time_horizon)]
+        exp_decay_weights = [np.e ** (-t / time_horizon) for t in range(time_horizon)]
         exp_decay_weights = exp_decay_weights[::-1]
 
     means_over_time = []
@@ -289,7 +290,7 @@ def plot_mean_attributions(
         k = 5
         ind = np.argpartition(feature_means, -k)[-k:].astype(int)
         print("No decay")
-        print(ind, np.array(xtick_labels)[ind])
+        print(np.array(xtick_labels)[ind])
         if decay:
             ind = np.argpartition(feature_means_lin_dec, -k)[-k:].astype(int)
             print("Linear decay")
@@ -314,9 +315,6 @@ def plot_mean_attributions(
             fmt="^",
             label="Linear decay",
         )
-        # Take out Temperature outlier
-        feature_means_exp_dec[26] = np.nan
-        feature_err_exp_dec[26] = np.nan
         plt.errorbar(
             xs,
             feature_means_exp_dec,
@@ -326,6 +324,6 @@ def plot_mean_attributions(
         )
     plt.ylabel("Attribution")
     plt.xticks(ticks=xs, labels=xtick_labels, rotation=50, fontsize=8, ha="right")
-    plt.legend()
+    # plt.legend()
     plt.title(title)
     plt.show()
