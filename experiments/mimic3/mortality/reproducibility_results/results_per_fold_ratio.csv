@@ -1,0 +1,8 @@
+Explainer,Accuracy,Comprehensiveness,Cross Entropy,Sufficiency
+augmented_occlusion,1.00,1.00,0.400,0.500
+deep_lift,0.000,0.000,0.500,0.000
+dyna_mask,1.00,4.00,0.200,3.00
+extremal_mask,0.750,1.00,0.875,1.00
+integrated_gradients,0.333,0.000,0.500,0.000
+occlusion,0.000,1.00,0.400,1.00
+retain,2.00,1.00,0.200,1.00

@@ -10,22 +10,30 @@ def format_with_condition(value, std, precision=2):
     elif -100 < value < 100:
         return f"{value:.{precision-1}f}±{std:.{precision-1}f}"
     elif -1000 < value < 1000:
-        print(value)
         return f"{value:.{precision-2}f}±{std:.{precision-2}f}"
     else:
         return f"{value:.{precision}e}±{std:.{precision}e}"
 
 
-def average_main_experiment(results_file='results_per_fold.csv'):
-    results_file_wo_extension = os.path.splitext(results_file)[0]
+def average_main_experiment(data, results_path='results_per_fold.csv', deletion_original=False):
+    if data == 'hmm':
+        metrics_columns = ['AUP', 'AUR', 'Information', 'Entropy']
+        grouping_columns = ['Seed', 'Explainer', 'Lambda_1', 'Lambda_2']
+    elif data == 'mimic':
+        metrics_columns = ['Accuracy', 'Comprehensiveness', 'Cross Entropy', 'Sufficiency']
+        grouping_columns = ['Seed', 'Explainer', 'Lambda_1', 'Lambda_2', 'Topk', 'Baseline']
+
+    results_path_wo_extension = os.path.splitext(results_path)[0]
 
     # Read the CSV file
-    df = pd.read_csv(results_file)
+    df = pd.read_csv(results_path)
 
-    # Remove the last two columns
-    df = df.iloc[:, :-2]
+    if 'Topk' in df and 'Baseline' in df:
+        df = df[(df['Topk'] == 0.2) & (df['Baseline'] == 'Average')]
+    
+    if deletion_original:
+        df = df[df['Deletion'] == True]
 
-    grouping_columns = ['Seed', 'Explainer', 'Lambda_1', 'Lambda_2']
     non_grouping_columns = [col for col in df.columns if col not in grouping_columns and col != 'Fold']
 
     agg_dict = {col: ['mean', 'std'] for col in non_grouping_columns}
@@ -38,20 +46,22 @@ def average_main_experiment(results_file='results_per_fold.csv'):
 
     # Create columns with average ± std format with the conditional formatting
     average_df = pd.DataFrame()
-    average_df[['Seed', 'Explainer', 'Lambda_1', 'Lambda_2']] = grouped_df[['Seed_', 'Explainer_', 'Lambda_1_', 'Lambda_2_']]
+    average_df[grouping_columns] = grouped_df[[f'{col}_' for col in grouping_columns]]
 
-    for metric in ['AUP', 'AUR', 'Information', 'Entropy']:
+    for metric in metrics_columns:
         average_df[f'{metric}'] = grouped_df.apply(lambda row: format_with_condition(row[f'{metric}_mean'], row[f'{metric}_std']), axis=1)
 
     # Save the result to a new CSV file with column headers
-    average_df.to_csv(f'{results_file_wo_extension}_averaged.csv', index=False)
+    average_df.to_csv(f'{results_path_wo_extension}_averaged.csv', index=False)
+
+    return average_df
     
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
-        "--experiment",
+        "--data",
         type=str,
-        default='main',
+        default='hmm',
         help="Experiment to obtain the average result for.",
     )
     parser.add_argument(
@@ -65,5 +75,7 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    if args.experiment == 'main':
-        average_main_experiment(args.results_file)
+    average_main_experiment(args.data, args.results_file)
+
+# python -m experiments.utils.average_results --data mimic --results-file experiments\mimic3\mortality\reproducibility_results\results.csv
+# python -m experiments.utils.average_results --data hmm

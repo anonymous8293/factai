@@ -1,0 +1,11 @@
+Explainer,AUP,AUR,Information,Entropy
+augmented_occlusion,2.60,1.48,1.65,0.877
+deep_lift,0.579,11.5,1.45,0.879
+dyna_mask,16.7,0.308,2.60,2.34
+extremal_mask,0.633,1.62,1.07,0.927
+fit,4.08,1.59,0.117,0.946
+gradient_shap,1.23,8.73,1.06,0.806
+integrated_gradients,0.684,11.9,1.40,0.919
+lime,1.06,17.1,1.16,0.430
+occlusion,1.66,18.3,1.54,1.48
+retain,0.409,4.15,4.33,3.45

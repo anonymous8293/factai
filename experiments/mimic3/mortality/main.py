@@ -143,8 +143,6 @@ def main(
     # Load data
     mimic3 = Mimic3(n_folds=5, fold=fold, seed=seed)
 
-
-
     # Create classifier
     classifier = MimicClassifierNet(
         feature_size=31,
@@ -164,6 +162,7 @@ def main(
         deterministic=deterministic,
         logger=False,
     )
+
     classifier = get_model(trainer, classifier, 'classifier', dataset_name, seed, fold, lambda_1=lambda_1, lambda_2=lambda_2, datamodule=mimic3)
 
     # Get data for explainers
