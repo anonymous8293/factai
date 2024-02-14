@@ -1,10 +1,10 @@
 #!/bin/bash
 
 processes=${processes:-5}
-device=${device:-cpu}
+device=${device:-cuda}
 seed=${seed:-42}
 outputfile=${outputfile:-mimic_results_per_fold.csv}
-preservation=${preservation:-true}
+deletion=${deletion:-false}
 minfold=${minfold:-0}
 maxfold=${maxfold:-4}
 explainers=${explainers:-all}
@@ -28,7 +28,7 @@ function ctrl_c() {
 
 for fold in $(seq $minfold $maxfold)
 do
-  if [[ $preservation = true ]]; then 
+  if [[ $deletion = false ]]; then 
     if [[ $explainers = all ]]; then
       python -m experiments.mimic3.mortality.main --device "$device" --fold "$fold" --seed "$seed" --deterministic --output-file "$outputfile" &
     else

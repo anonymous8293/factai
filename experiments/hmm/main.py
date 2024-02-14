@@ -1,6 +1,5 @@
 import multiprocessing as mp
 import numpy as np
-import random
 import torch as th
 import torch.nn as nn
 
@@ -8,7 +7,6 @@ from argparse import ArgumentParser
 from captum.attr import DeepLift, GradientShap, IntegratedGradients, Lime
 from pytorch_lightning import Trainer, seed_everything
 from typing import List
-from pytorch_lightning.loggers import TensorBoardLogger
 
 from tint.attr import (
     DynaMask,
@@ -38,9 +36,7 @@ from tint.metrics.white_box import (
 from tint.models import MLP, RNN
 
 from experiments.utils.get_model import get_model
-from experiments.utils.model_utils import get_perturbed_data
 from experiments.hmm.classifier import StateClassifierNet
-import pickle
 
 
 
@@ -466,29 +462,13 @@ def main(
             fp.write(f"{auprc(v, true_saliency):.4}")
             fp.write("\n")
         
-    # with open(output_file, "a") as fp, lock:
-    #     for k, v in attr.items():
-    #         fp.write(str(seed) + ",")
-    #         fp.write(str(fold) + ",")
-    #         fp.write(k + ",")
-    #         fp.write(str(lambda_1) + ",")
-    #         fp.write(str(lambda_2) + ",")
-    #         fp.write(f"{aup(v, true_saliency):.4},")
-    #         fp.write(f"{aur(v, true_saliency):.4},")
-    #         fp.write(f"{information(v, true_saliency):.4},")
-    #         fp.write(f"{entropy(v, true_saliency):.4},")
-    #         fp.write(f"{roc_auc(v, true_saliency):.4},")
-    #         fp.write(f"{auprc(v, true_saliency):.4}")
-    #         fp.write("\n")
-
-
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
         "--explainers",
         type=str,
         default=[
-            #"deep_lift",
+            "deep_lift",
             "dyna_mask",
             "extremal_mask",
             "fit",

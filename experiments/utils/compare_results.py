@@ -1,7 +1,7 @@
 import pandas as pd
 from argparse import ArgumentParser
 import numpy as np
-from experiments.utils.average_results import average_main_experiment
+from experiments.utils.average_results import average_results
 import os
 
 def format_with_condition(value, precision=2):
@@ -42,7 +42,7 @@ def compare_results(data, original_results_filename, repro_results_filename, rat
     repro_filename_without_extension = repro_results_filename.split('.')[0]
     original_results_path = f'{original_results_dir_path}/{original_results_filename}'
     output_dir_path = f'{original_results_dir_path}/reproducibility_results'
-    repro_results_path = f'{output_dir_path}/{repro_results_filename}'
+    repro_file_path = f'{output_dir_path}/{repro_results_filename}'
 
     if ratio_mode:
         vec_func = np.vectorize(get_ratio)
@@ -53,12 +53,12 @@ def compare_results(data, original_results_filename, repro_results_filename, rat
 
     # Need to copy paste updated result from the e-mail
     if data != 'hmm':
-        original_df_averaged = average_main_experiment(data, original_results_path, deletion)
+        original_df_averaged = average_results(data, original_results_path, deletion)
     else:
         original_results_path_wo_extension = os.path.splitext(original_results_path)[0]
         original_df_averaged = pd.read_csv(f'{original_results_path_wo_extension}_averaged.csv', dtype={'Entropy': 'object'})
 
-    repro_df_averaged = average_main_experiment(data, repro_results_path)
+    repro_df_averaged = average_results(data, repro_file_path)
 
     explainer_values_repro = repro_df_averaged["Explainer"].unique()
 
@@ -82,13 +82,13 @@ def parse_args():
         help="The dataset used will locate the folder under experiments.",
     )
     parser.add_argument(
-        "--original-results",
+        "--original-file",
         type=str,
         default="original_results.csv",
         help="File of original results.",
     )
     parser.add_argument(
-        "--repro_results",
+        "--repro-file",
         type=str,
         default="results_per_fold.csv",
         help="File of reproduced results.",
@@ -101,15 +101,15 @@ def parse_args():
     parser.add_argument(
         "--deletion",
         action="store_true",
-        help="Deletion game to optimize.",
+        help="Deletion game results.",
     )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    compare_results(args.data, args.original_results, args.repro_results, args.ratio, args.deletion)
+    compare_results(args.data, args.original_file, args.repro_file, args.ratio, args.deletion)
 
 # python -m experiments.utils.compare_results --data mimic --ratio
-# python -m experiments.utils.compare_results --data hmm --original-results original_deletion_results.csv --repro_results deletion_game.csv --ratio --deletion
+# python -m experiments.utils.compare_results --data hmm --original-results original_deletion_results.csv --repro_file deletion_game.csv --ratio --deletion
 # python -m experiments.utils.compare_results --data hmm --ratio

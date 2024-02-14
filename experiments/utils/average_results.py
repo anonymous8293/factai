@@ -13,30 +13,26 @@ def format_with_condition(value, std, precision=2):
         return f"{value:.{precision-2}f}±{std:.{precision-2}f}"
     else:
         return f"{value:.{precision}e}±{std:.{precision}e}"
-
-
-def average_main_experiment(data, results_path='results_per_fold.csv', deletion_original=False):
+    
+def average_results(data, results_filepath, deletion_game=False):
+    grouping_columns = ['Seed', 'Explainer', 'Lambda_1', 'Lambda_2']
     if data == 'hmm':
         metrics_columns = ['AUP', 'AUR', 'Information', 'Entropy']
-        grouping_columns = ['Seed', 'Explainer', 'Lambda_1', 'Lambda_2']
     elif data == 'mimic':
         metrics_columns = ['Accuracy', 'Comprehensiveness', 'Cross Entropy', 'Sufficiency']
-        grouping_columns = ['Seed', 'Explainer', 'Lambda_1', 'Lambda_2', 'Topk', 'Baseline']
 
-    results_path_wo_extension = os.path.splitext(results_path)[0]
+    results_path_wo_extension = os.path.splitext(results_filepath)[0]
 
     # Read the CSV file
-    df = pd.read_csv(results_path)
+    df = pd.read_csv(results_filepath)
 
-    if 'Topk' in df and 'Baseline' in df:
+    if data == 'mimic':
         df = df[(df['Topk'] == 0.2) & (df['Baseline'] == 'Average')]
     
-    if deletion_original:
+    if deletion_game:
         df = df[df['Deletion'] == True]
 
-    non_grouping_columns = [col for col in df.columns if col not in grouping_columns and col != 'Fold']
-
-    agg_dict = {col: ['mean', 'std'] for col in non_grouping_columns}
+    agg_dict = {col: ['mean', 'std'] for col in metrics_columns}
 
     # Grouping and aggregating for non-grouping columns
     grouped_df = df.groupby(grouping_columns).agg(agg_dict).reset_index()
@@ -44,7 +40,7 @@ def average_main_experiment(data, results_path='results_per_fold.csv', deletion_
     # Flatten the MultiIndex column headers
     grouped_df.columns = ['_'.join(col).strip() for col in grouped_df.columns.values]
 
-    # Create columns with average ± std format with the conditional formatting
+    # Create columns with average ± std format
     average_df = pd.DataFrame()
     average_df[grouping_columns] = grouped_df[[f'{col}_' for col in grouping_columns]]
 
@@ -61,21 +57,23 @@ def parse_args():
     parser.add_argument(
         "--data",
         type=str,
-        default='hmm',
+        default='mimic',
         help="Experiment to obtain the average result for.",
     )
     parser.add_argument(
-        "--results-file",
+        "--results-filepath",
         type=str,
-        default="results_per_fold.csv",
+        default="experiments/mimic3/mortality/reproducibility_results/our_mimic_deletion_results_per_fold.csv",
         help="Where the results per fold are saved.",
+    )
+    parser.add_argument(
+        "--deletion",
+        action="store_true",
+        help="Deletion game results.",
     )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    average_main_experiment(args.data, args.results_file)
-
-# python -m experiments.utils.average_results --data mimic --results-file experiments\mimic3\mortality\reproducibility_results\results.csv
-# python -m experiments.utils.average_results --data hmm
+    average_results(args.data, args.results_filepath, args.deletion)

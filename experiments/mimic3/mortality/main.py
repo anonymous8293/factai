@@ -121,7 +121,6 @@ def main(
     preservation_mode: bool = True
 ):
     dataset_name = 'mimic3'
-    data_name = dataset_name
     pickle_folder="experiments/pickles/"
     
         
@@ -300,36 +299,6 @@ def main(
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
         print("finished analyzing ", model_name, "output to ",output_file)
 
-
-    # if "extremal_mask_alt" in explainers:
-    #     model_name="extremal_mask_alt"
-    #     attr[model_name]=None
-    #     inputs_mimic=x_test
-    #     (extremal_mask_attr_mimic,extremal_mask_explainer_mimic,extremal_mask_mask_net_mimic) = load_explainer(dataset_name="mimic3", pickle_dir="experiments/pickles/", method="extremal_mask", seed=seed, fold=fold)
-    #     (extremal_mimic_batch,extremal_perturbation_mimic, extremal_mask_mimic, extremal_x1_mimic, extremal_x2_mimic,) = compute_perturbations(
-    #         data=inputs_mimic,mask_net=extremal_mask_mask_net_mimic,perturb_net=extremal_mask_mask_net_mimic.net.model,batch_idx=0)
-    #     alt_mask = compute_alternative(extremal_mimic_batch, extremal_mask_mimic, extremal_perturbation_mimic)
-    #     attr[model_name]=alt_mask
-    #     output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
-    #     print("finished analyzing ", model_name, "output to ",output_file)  
-
-
-    # if "extremal_mask_alt2" in explainers:
-    #     model_name="extremal_mask_alt2"
-    #     attr[model_name]=None
-    #     inputs_mimic=x_test
-    #     (extremal_mask_attr_mimic,extremal_mask_explainer_mimic,extremal_mask_mask_net_mimic) = load_explainer(dataset_name="mimic3", pickle_dir="experiments/pickles/", method="extremal_mask", seed=seed, fold=fold)
-    #     (extremal_mimic_batch,extremal_perturbation_mimic, extremal_mask_mimic, extremal_x1_mimic, extremal_x2_mimic,) = compute_perturbations(
-    #         data=inputs_mimic,mask_net=extremal_mask_mask_net_mimic,perturb_net=extremal_mask_mask_net_mimic.net.model,batch_idx=0)
-    #     alt_mask = compute_alternative2(extremal_mimic_batch, extremal_mask_mimic, extremal_perturbation_mimic)
-        
-    #     attr[model_name]=alt_mask
-    #     output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
-    #     print("finished analyzing ", model_name, "output to ",output_file)  
-
-
-
-
     if "fit" in explainers:
         model_name="fit"
         attr[model_name]=load_explainer2( dataset_name, model_name, pickle_folder, seed, fold)
@@ -485,12 +454,6 @@ def main(
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
         print("finished analyzing ", model_name, "output to ",output_file)  
 
-
-
-
-
-
-
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
@@ -498,8 +461,8 @@ def parse_args():
         type=str,
         default=[
             "extremal_mask",
-           "deep_lift",
-           "dyna_mask",
+            "deep_lift",
+            "dyna_mask",
             "augmented_occlusion",
             "occlusion",
             "retain",

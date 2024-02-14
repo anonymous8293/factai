@@ -1,10 +1,10 @@
 #!/bin/bash
 
 processes=${processes:-5}
-device=${device:-cpu}
+device=${device:-cuda}
 seed=${seed:-42}
 outputfile=${outputfile:-hmm_results_per_fold.csv}
-preservation=${preservation:-true}
+deletion=${deletion:-false}
 ce=${ce:-false}
 minfold=${minfold:-0}
 maxfold=${maxfold:-4}
@@ -28,7 +28,7 @@ function ctrl_c() {
 
 for fold in $(seq $minfold $maxfold)
 do
-  if [[ $preservation = true ]]; then 
+  if [[ $deletion = false ]]; then 
     if [[ $ce = false ]]; then 
       python -m experiments.hmm.main --device "$device" --fold "$fold" --seed "$seed" --deterministic --output-file "$outputfile"&
     else

@@ -1,47 +1,25 @@
-import os
-import shutil
-
 from argparse import ArgumentParser
 
 
-def main(experiment: str):
-    if experiment == "main":
-        with open("results.csv", "w") as fp:
-            fp.write(
-                "Seed,Fold,Baseline,Topk,Explainer,Lambda_1,Lambda_2,Accuracy,Comprehensiveness,Cross Entropy,"
-                "Log Odds,Sufficiency\n"
-            )
-
-    if experiment == "lambda_study":
-        with open("lambda_study.csv", "w") as fp:
-            fp.write(
-                "Seed,Fold,Baseline,Topk,Explainer,Lambda_1,Lambda_2,Accuracy,Comprehensiveness,Cross Entropy,"
-                "Log Odds,Sufficiency\n"
-            )
-
-    elif experiment == "extremal_mask_params":
-        with open("extremal_mask_params.csv", "w") as fp:
-            fp.write("Metric,Baseline,Topk,Model\n")
-
-    else:
-        raise NotImplementedError
-
-    if os.path.exists("lightning_logs"):
-        shutil.rmtree("lightning_logs")
+def main(outputfile: str = 'mimic_results_per_fold.csv'):
+    with open(outputfile, "w") as fp:
+        fp.write(
+            "Seed,Fold,Baseline,Topk,Explainer,Lambda_1,Lambda_2,Accuracy,Comprehensiveness,Cross Entropy,"
+            "Log Odds,Sufficiency\n"
+        )
 
 
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
-        "--experiment",
-        "-e",
+        "--outputfile",
         type=str,
-        required=True,
-        help="Name of the experiment. Either 'main', 'lambda_study' or 'extremal_mask_params'.",
+        default='mimic_results_per_fold.csv',
+        help="Output file name",
     )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    main(experiment=args.experiment)
+    main(outputfile=args.outputfile)
