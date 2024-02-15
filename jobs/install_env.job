@@ -13,4 +13,4 @@ module load 2022
 module load Anaconda3/2022.05
  
 cd $HOME/factai/
-conda env create -f environment.yml
+sh shells/install_env.sh

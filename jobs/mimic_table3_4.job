@@ -1,0 +1,16 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu
+#SBATCH --gpus=1
+#SBATCH --job-name=MIMIC_Table3_4
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=9
+#SBATCH --time=24:00:00
+#SBATCH --output=MIMIC_table3_4_%A.out
+
+module purge
+module load 2022
+module load Anaconda3/2022.05
+ 
+cd $HOME/factai/
+sh shells/mimic_table3_4.sh

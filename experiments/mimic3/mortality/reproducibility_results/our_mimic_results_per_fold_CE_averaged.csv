@@ -1,0 +1,3 @@
+Seed,Explainer,Lambda_1,Lambda_2,AUP,AUR,Information,Entropy
+42,dyna_mask,1,1,0.341±0.003,0.569±0.002,1.23e+05±1.22e+03,9.32e+03±1.61e+02
+42,extremal_mask,1,1,0.913±0.009,0.666±0.012,1.54e+05±6.58e+03,1.59e+04±4.36e+02
