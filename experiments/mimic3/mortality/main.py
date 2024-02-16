@@ -200,10 +200,10 @@ def main(
                 show_progress=True,
             ).abs()
         
-        # save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-        # save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        save_explainer(attr[model_name], model_name+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+        save_explainer(explainer,        model_name+"_explainer", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
-        print("finished analyzing ", model_name, "output to ",output_file)
+        print("Finished analyzing ", model_name, " and saving output to ", output_file)
 
     if "dyna_mask" in explainers:
         model_name="dyna_mask" 
@@ -239,11 +239,12 @@ def main(
             print(f"Best keep ratio is {_attr[1]}")
             attr["dyna_mask"] = _attr[0].to(device)
 
-            save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-            save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-            save_explainer( mask,             model_name+"_mask",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(attr[model_name], model_name+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(explainer,        model_name+"_explainer", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(mask,             model_name+"_mask", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
-        print("finished analyzing ", model_name, "output to ",output_file)
+        print("Finished analyzing ", model_name, " and saving output to ", output_file)
 
     if "extremal_mask" in explainers:
         model_name="extremal_mask"
@@ -283,8 +284,13 @@ def main(
                 batch_size=100,
             )
             attr["extremal_mask"] = _attr.to(device)
+
+            save_explainer(attr[model_name], model_name+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(explainer,        model_name+"_explainer", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(mask,             model_name+"_mask", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
-        print("finished analyzing ", model_name, "output to ",output_file)
+        print("Finished analyzing ", model_name, " and saving output to ", output_file)
 
     if "fit" in explainers:
         model_name="fit"
@@ -309,7 +315,11 @@ def main(
                 fold=fold
             )
             attr["fit"] = explainer.attribute(x_test, show_progress=True)
+            save_explainer(attr[model_name], model_name+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(explainer,        model_name+"_explainer", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+        print("Finished analyzing ", model_name, " and saving output to ", output_file)  
 
     if "gradient_shap" in explainers:
         model_name="gradient_shap"
@@ -326,10 +336,11 @@ def main(
             ).abs().to(device)
             classifier.to(device)
             model_name="gradient_shap"
-            save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-            save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-            output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
-        print("finished analyzing ", model_name, "output to ",output_file)  
+            save_explainer(attr[model_name], model_name+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(explainer,        model_name+"_explainer", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+
+        output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+        print("Finished analyzing ", model_name, " and saving output to ", output_file)  
 
     if "integrated_gradients" in explainers:
         model_name="integrated_gradients"
@@ -344,10 +355,11 @@ def main(
                 show_progress=True,
             ).abs()
 
-            save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-            save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(attr[model_name], model_name+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(explainer,        model_name+"_explainer", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
-        print("finished analyzing ", model_name, "output to ",output_file)  
+        print("Finished analyzing ", model_name, " and saving output to ", output_file)  
 
     if "lime" in explainers:
         model_name="lime"
@@ -360,14 +372,13 @@ def main(
                 show_progress=True,
             ).abs()
 
-            save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-            save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(attr[model_name], model_name+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(explainer,        model_name+"_explainer", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
 
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
-        print("finished analyzing ", model_name, "output to ",output_file)  
+        print("Finished analyzing ", model_name, " and saving output to ", output_file)  
 
     if "augmented_occlusion" in explainers:
-
         model_name="augmented_occlusion"
         attr[model_name]=load_explainer2( dataset_name, model_name, pickle_folder, seed, fold)
         if(attr[model_name] is None):
@@ -383,7 +394,12 @@ def main(
                 task="binary",
                 show_progress=True,
             ).abs()
+            
+            save_explainer(attr[model_name], model_name+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(explainer,        model_name+"_explainer", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
+        print("Finished analyzing ", model_name, " and saving output to ", output_file)  
 
     if "occlusion" in explainers:
         model_name="occlusion"
@@ -399,11 +415,11 @@ def main(
                 show_progress=True,
             ).abs()
 
-            save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-            save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(attr[model_name], model_name+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(explainer,        model_name+"_explainer", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
 
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
-        print("finished analyzing ", model_name, "output to ",output_file)  
+        print("Finished analyzing ", model_name, " and saving output to ", output_file)  
 
     if "retain" in explainers:
         model_name="retain"
@@ -436,10 +452,11 @@ def main(
             attr["retain"] = (
                 explainer.attribute(x_test, target=y_test).abs().to(device)
             )
-            save_explainer( attr[model_name], model_name+"_attr",             dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
-            save_explainer( explainer,        model_name+"_explainer",        dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(attr[model_name], model_name+"_attr", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+            save_explainer(explainer,        model_name+"_explainer", dataset_name, seed, fold, lambda_1, lambda_2, retrain, preservation_mode)
+
         output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device)
-        print("finished analyzing ", model_name, "output to ",output_file)  
+        print("Finished analyzing ", model_name, " and saving output to ", output_file)  
 
 def parse_args():
     parser = ArgumentParser()
