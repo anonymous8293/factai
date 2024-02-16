@@ -1,6 +1,6 @@
 import multiprocessing as mp
 import numpy as np
-import random
+import os
 import torch as th
 import torch.nn as nn
 
@@ -8,7 +8,6 @@ from argparse import ArgumentParser
 from captum.attr import DeepLift, GradientShap, IntegratedGradients, Lime
 from pytorch_lightning import Trainer, seed_everything
 from typing import List
-# from tint.utils.perturbations import compute_perturbations
 
 from tint.attr import (
     DynaMask,
@@ -34,16 +33,13 @@ from tint.metrics import (
     sufficiency,
 )
 from tint.models import MLP, RNN
-from experiments.utils.get_model import get_model, get_explainer, save_explainer, load_explainer2
-# from tint.utils.model_loading import load_explainer
-# from tint.utils.perturbations import compute_alternative, compute_alternative2
+from experiments.utils.get_model import get_model, save_explainer, load_explainer2
 
 from experiments.mimic3.mortality.classifier import MimicClassifierNet
 
 
 
 def output_all(output_file, x_avg,areas,  attr, classifier, x_test, lock, seed, fold, lambda_1, lambda_2, device):
-    
     
     cpu_classifier=classifier.to("cpu")
     cpu_x_test = x_test.to("cpu")
@@ -121,9 +117,11 @@ def main(
     preservation_mode: bool = True
 ):
     dataset_name = 'mimic3'
-    pickle_folder="experiments/pickles/"
+    pickle_folder = "experiments/pickles/"
     
-        
+    if not os.path.exists(pickle_folder):
+        os.makedirs(pickle_folder)
+
     retrain = False
 
     # If deterministic, seed everything
@@ -170,19 +168,11 @@ def main(
         x_test = mimic3.preprocess(split="test")["x"].to(device)
         y_test = mimic3.preprocess(split="test")["y"].to(device)
 
-        # print("x_train shape", x_train.size())
-        # print("x_test shape", x_train.size())
-        # print("y_t# est shape", x_train.size())
-
-    print("y_test mean", th.mean(y_test.float()))
-
     # Switch to eval
     classifier.eval()
 
     # Set model to device
     classifier.to(device)
-
-    
 
     # Disable cudnn if using cuda accelerator.
     # Please see https://captum.ai/docs/faq#how-can-i-resolve-cudnn-rnn-backward-error-for-rnn-or-lstm-network
@@ -190,11 +180,8 @@ def main(
     if accelerator == "cuda":
         th.backends.cudnn.enabled = False
 
-
-    #for printing out
     # Compute x_avg for the baseline
     x_avg = x_test.mean(1, keepdim=True).repeat(1, x_test.to("cpu").shape[1], 1)
-        # Classif:ier and x_test to cpu
 
     # Create dict of attributions
     attr = dict()
