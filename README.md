@@ -34,3 +34,7 @@ The jobs file under the jobs directory under the root should be modified if one 
 Furthermore, our results may be found under the `reproducibility_results` directory with the prefix `our`.
 
 ## Additional Study
+
+To reproduce the tables and figures associated to the extensions, please follow the walkthroughs in the following Jupyter notebooks:
+- Extension 1 and Appendix: `Extension_1.ipynb`
+- Extension 2: `Extension_2.ipynb`
