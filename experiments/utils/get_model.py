@@ -3,9 +3,6 @@ import torch as th
 
 
 import pickle
-# def save_explainer(explainer, explainer_name="explainer"):
-#     with open(f"{explainer_name}.pkl", "wb") as f:
-#         pickle.dump(explainer, f)
 
 def load_explainer2(
     dataset_name: str,
