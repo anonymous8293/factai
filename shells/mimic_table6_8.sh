@@ -8,4 +8,4 @@ rm -f $outputfile
 python -m experiments.mimic3.mortality.reset --outputfile $outputfile
 experiments/mimic3/mortality/main.sh --outputfile $outputfile --deletion
 mv $outputfile experiments/mimic3/mortality/reproducibility_results
-python -m experiments.utils.compare_results --data mimic --repro-file $outputfile --original-file $originalfile --ratio
+python -m experiments.utils.compare_results --data mimic --repro-file $outputfile --original-file $originalfile --deletion --ratio
