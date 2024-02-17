@@ -39,3 +39,6 @@ Furthermore, our results may be found under the `reproducibility_results` direct
 To reproduce the tables and figures associated to the extensions, please follow the walkthroughs in the following Jupyter notebooks:
 - Extension 1 and Appendix: `Extension_1.ipynb`
 - Extension 2: `Extension_2.ipynb`
+
+## Acknowledgement
+This repository is extended from `https://github.com/josephenguehard/time_interpret` used in the paper "Learning Perturbations to Explain Time Series Predictions".
