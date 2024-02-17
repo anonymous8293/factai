@@ -12,7 +12,7 @@ The first steps are installing conda and the associated environment.
     - Activate the environment by `conda activate tint`.
 
 ## Reproducibility Study
-First, one needs to set up the MIMIC-III dataset according to `https:\\josephenguehard.github.io\time_interpret\build\html\datasets.html#tint.datasets.Mimic3`.
+To run the experiments on the MIMIC-III dataset, one needs to set it up according to <https:\\josephenguehard.github.io\time_interpret\build\html\datasets.html#tint.datasets.Mimic3>.
 
 The jobs file under the jobs directory under the root should be modified if one wishes to reproduce our results on a system supporting job files. Otherwise, the tables in our paper may be retrieved from running the shell scripts. Specifically, by executing the following commands in the bash script for:
 
@@ -41,4 +41,4 @@ To reproduce the tables and figures associated to the extensions, please follow 
 - Extension 2: `Extension_2.ipynb`
 
 ## Acknowledgement
-This repository is extended from `https://github.com/josephenguehard/time_interpret` used in the paper "Learning Perturbations to Explain Time Series Predictions".
+This repository is extended from <https://github.com/josephenguehard/time_interpret> used in the paper "Learning Perturbations to Explain Time Series Predictions".
