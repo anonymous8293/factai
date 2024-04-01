@@ -51,12 +51,12 @@ def compare_results(data, original_results_filename, repro_results_filename, rat
         vec_func = np.vectorize(get_difference)
         comparison_type = 'diff'
 
-    # Need to copy paste updated result from the e-mail
-    if data != 'hmm':
-        original_df_averaged = average_results(data, original_results_path, deletion)
-    else:
+    # Need to copy paste updated information and entropy averages from the e-mail
+    if data == 'hmm' and not deletion:
         original_results_path_wo_extension = os.path.splitext(original_results_path)[0]
         original_df_averaged = pd.read_csv(f'{original_results_path_wo_extension}_averaged.csv', dtype={'Entropy': 'object'})
+    else:
+        original_df_averaged = average_results(data, original_results_path, deletion)
 
     repro_df_averaged = average_results(data, repro_file_path)
 
@@ -109,7 +109,3 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     compare_results(args.data, args.original_file, args.repro_file, args.ratio, args.deletion)
-
-# python -m experiments.utils.compare_results --data mimic --ratio
-# python -m experiments.utils.compare_results --data hmm --original-results original_deletion_results.csv --repro_file deletion_game.csv --ratio --deletion
-# python -m experiments.utils.compare_results --data hmm --ratio
