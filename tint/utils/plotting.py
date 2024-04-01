@@ -230,6 +230,7 @@ def plot_mean_attributions(
     debug=False,
     figsize=(10, 6),
     show_legend=True,
+    transparency: float | None = None,
 ):
     def compute_means_errors(means_over_time):
         # Compute means and confidence intervals
@@ -309,27 +310,56 @@ def plot_mean_attributions(
         xs,
         feature_means,
         yerr=feature_err.T,
-        fmt="^",
+        fmt="none",
         label="No decay" if decay else "Mean attribution",
+        alpha=transparency,
+        elinewidth=5,
+        ecolor="cornflowerblue",
+    )
+    plt.errorbar(
+        xs, feature_means, yerr=None, fmt="^", markersize=12, mfc="cornflowerblue"
     )
     if decay:
         plt.errorbar(
             xs,
             feature_means_lin_dec,
             yerr=feature_err_lin_dec.T,
-            fmt="^",
+            fmt="none",
             label="Linear decay",
+            alpha=transparency,
+            elinewidth=5,
+            ecolor="orange",
+        )
+        plt.errorbar(
+            xs,
+            feature_means_lin_dec,
+            yerr=None,
+            fmt="^",
+            markersize=12,
+            mfc="orange",
         )
         plt.errorbar(
             xs,
             feature_means_exp_dec,
             yerr=feature_err_exp_dec.T,
-            fmt="^",
+            fmt="none",
             label="Exponential decay",
+            alpha=transparency,
+            elinewidth=5,
+            ecolor="green",
         )
-    plt.ylabel("Attribution")
-    plt.xticks(ticks=xs, labels=xtick_labels, rotation=50, fontsize=8, ha="right")
+        plt.errorbar(
+            xs,
+            feature_means_exp_dec,
+            yerr=None,
+            fmt="^",
+            markersize=12,
+            mfc="green",
+        )
+    plt.ylabel("Attribution", fontsize=12)
+    plt.xticks(ticks=xs, labels=xtick_labels, rotation=50, fontsize=12, ha="right")
+    plt.yticks(fontsize=12)
     if show_legend:
-        plt.legend()
-    plt.title(title)
+        plt.legend(fontsize=12)
+    plt.title(title, fontsize=14)
     plt.show()
