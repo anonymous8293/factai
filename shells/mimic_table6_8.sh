@@ -2,7 +2,7 @@
 # Table 3 is experiments/mimic3/mortality/reproducibility_results/mimic_deletion_results_per_fold_averaged.csv
 # Table 4 is experiments/mimic3/mortality/reproducibility_results/mimic_deletion_results_per_fold_ratio.csv
 outputfile=mimic_deletion_results_per_fold.csv
-originalresults=original_deletion_results.csv
+originalfile=original_deletion_results.csv
 
 rm -f $outputfile
 python -m experiments.mimic3.mortality.reset --outputfile $outputfile

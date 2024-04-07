@@ -2,17 +2,11 @@ import os
 import pandas as pd
 from argparse import ArgumentParser
 
-def format_with_condition(value, std, precision=2):
-    if -1 < value < 1:
-        return f"{value:.{precision+1}f}±{std:.{precision+1}f}"
-    elif -10 < value < 10:
-        return f"{value:.{precision}f}±{std:.{precision}f}"
-    elif -100 < value < 100:
-        return f"{value:.{precision-1}f}±{std:.{precision-1}f}"
-    elif -1000 < value < 1000:
-        return f"{value:.{precision-2}f}±{std:.{precision-2}f}"
+def format_with_condition(value, std, precision=3):
+    if -0.1 >= value or value >= 0.1:
+        return f"{value:.{precision}}±{std:.{precision}f}"
     else:
-        return f"{value:.{precision}e}±{std:.{precision}e}"
+        return f"{value:.{precision-1}e}±{std:.{precision-1}e}"
     
 def average_results(data, results_filepath, deletion_game=False):
     grouping_columns = ['Seed', 'Explainer', 'Lambda_1', 'Lambda_2']

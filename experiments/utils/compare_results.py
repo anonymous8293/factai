@@ -4,17 +4,11 @@ import numpy as np
 from experiments.utils.average_results import average_results
 import os
 
-def format_with_condition(value, precision=2):
-    if -1 < value < 1:
-        return f"{value:.{precision+1}f}"
-    elif -10 < value < 10:
-        return f"{value:.{precision}f}"
-    elif -100 < value < 100:
-        return f"{value:.{precision-1}f}"
-    elif -1000 < value < 1000:
-        return f"{value:.{precision-2}f}"
+def format_with_condition(value, precision=3):
+    if -0.1 >= value or value >= 0.1:
+        return f"{value:.{precision}}"
     else:
-        return f"{value:.{precision}e}"
+        return f"{value:.{precision-1}e}"
 
 def get_difference(x, y):
     mean_std_x = x.split('±')
