@@ -1,4 +1,8 @@
-# Instructions for reproducing the results in "Reproducibility Study of 'Learning Perturbations to Explain Time Series Predictions'"
+# Reproducibility Study of 'Learning Perturbations to Explain Time Series Predictions'
+
+In this work, we attempt to reproduce the results of [Enguehard (2023)](https://arxiv.org/abs/2305.18840), which introduced ExtremalMask, a mask-based perturbation method for explaining time series data. We verified the core claims of the original paper and proposed new interpretations for the model's outputs. Read the [full reproducibility paper](https://openreview.net/forum?id=fCNqD2IuoD) accepted at [TMLR](https://jmlr.org/tmlr/).
+
+## Instructions for reproducing our results
 
 The first steps are installing conda and the associated environment.
 
